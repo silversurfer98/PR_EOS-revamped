@@ -1,4 +1,4 @@
-# cmake ./src -G "MinGW Makefiles" -B ../build
+# cmake ./src -G "MinGW Makefiles" -B ./build
 
 cmake_minimum_required(VERSION 3.0)
 project(DB_access)
