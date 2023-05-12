@@ -12,7 +12,7 @@ private:
     sqlite3 *db;
     std::string querry = "select * from *";
     bool Is_database_open = false;
-    
+    unsigned int total_gas_in_db = 0;
 //class members
     bool open_db();
 
@@ -47,7 +47,6 @@ bool db_class:: open_db()
 {
     int rc;
     rc = sqlite3_open(database_filename.c_str(), &db);
-
     if(rc) 
        return false;
     else 
@@ -57,22 +56,43 @@ bool db_class:: open_db()
 unsigned int db_class:: print_all_gas()
 {
     // check whether db is open
-    if (Is_database_open)
-        return 1;
+    if (!Is_database_open)
+        return 2;
     
     // sql querry
     // select gas_name from base_gas_prop where id<=(SELECT MAX(id) FROM base_gas_prop);
     querry.erase();
-    querry = "select gas_name from base_gas_prop where id<=(SELECT MAX(id) FROM base_gas_prop)";
+    // get total number of gases
+    querry = "SELECT MAX(id) FROM base_gas_prop";
     sqlite3_stmt* stmt;
-
-    sqlite3_prepare(db, querry.c_str(), 100, &stmt, NULL);
-    if (sqlite3_step(stmt) == 100)
-    {
-        std::cout<<"gas is "<<sqlite3_column_text(stmt, 1);
-    }
-    else
+    sqlite3_prepare_v3(db, querry.c_str(), 100, SQLITE_PREPARE_PERSISTENT, &stmt, NULL);
+    if(sqlite3_step(stmt) == 100)
+        total_gas_in_db = (unsigned int)sqlite3_column_int(stmt, 0);
+    else 
         return 1;
-    
+
+    querry.erase();
+    querry = "select gas_name from base_gas_prop where id<=(SELECT MAX(id) FROM base_gas_prop)";
+    sqlite3_prepare_v3(db, querry.c_str(), 100, SQLITE_PREPARE_PERSISTENT, &stmt, NULL);
+    std::string gas_name;
+    for(unsigned int i=0; i<total_gas_in_db; i++)
+    {
+        if (sqlite3_step(stmt) == 100)
+        {
+            gas_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            gas_names.push_back(gas_name);
+        }
+        else
+        {
+            return 1;
+            break;
+        }
+        gas_name.erase();
+    }
+
     sqlite3_finalize(stmt);
+
+    for(auto& i: gas_names)
+        std::cout<<"\n"<<i;
+    return 0;
 }

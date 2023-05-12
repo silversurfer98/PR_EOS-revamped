@@ -20,4 +20,8 @@ set_target_properties(sqlite PROPERTIES
   DEFINE_SYMBOL MYDLL_EXPORTS
 )
 
-install(TARGETS sqlite RUNTIME DESTINATION ${CMAKE_BINARY_DIR}/bin)
+if (EXISTS "${CMAKE_BINARY_DIR}/bin/libsqlite.dll")
+    message("DLL exsists")
+else()
+    install(TARGETS sqlite RUNTIME DESTINATION ${CMAKE_BINARY_DIR}/bin)
+endif()

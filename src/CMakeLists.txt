@@ -27,5 +27,5 @@ link_directories(${CMAKE_BINARY_DIR}/libs)
 set(SOURCE_FILES main.cpp)
 add_executable(final ${SOURCE_FILES})
 
-target_link_libraries(final sqlite db_class)
+target_link_libraries(final db_class)
 install(TARGETS final RUNTIME DESTINATION ${CMAKE_BINARY_DIR}/bin)
