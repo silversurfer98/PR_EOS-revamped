@@ -8,6 +8,8 @@ int main()
     std::unique_ptr<std::vector<std::vector<float>>> bip = mydbclass.get_bip_pointer();
     //bip = mydbclass.get_bip_pointer();
 
+    mydbclass.cp_const_data_aquisition();
+
 // print the bip data
 
     std::cout<<"\n I'm from main\n\n";

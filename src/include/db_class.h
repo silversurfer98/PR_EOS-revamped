@@ -1,4 +1,3 @@
-#include <string>
 #include <vector>
 #include<memory>
 class db_class
@@ -9,8 +8,13 @@ public:
 //class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
-    void choosen_gas_querry();
-    unsigned int prepare_bip();
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
+    unsigned int cp_const_data_aquisition();
 
+
+};
+
+struct CP_Const
+{
+    float A, B, C, D;
 };

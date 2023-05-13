@@ -5,10 +5,15 @@
 #include<memory>
 #include<iostream>
 
+struct CP_Const
+{
+    float A, B, C, D;
+};
+
 class db_class
 {
 private:
-// variables
+// Private variables
     const std::string database_filename = "props.db";
     
     sqlite3 *db;
@@ -24,21 +29,27 @@ private:
     std::set<unsigned int> gas_choice_id;
 
     std::unique_ptr<std::vector<std::vector<float>>> bip_pointer;
-//class members
-    bool open_db();
+    std::unique_ptr<std::vector<CP_Const>> cp_const_vals;
+
+
+    unsigned int process_count = 0;
+// Private class members
     ~db_class();
     void gas_choice_str2Vec();
+    unsigned int choosen_gas_bip_querry();
+    unsigned int prepare_bip();
+    void choose_gas_from_user();
     
 
 public:
-// variables
+// Public variables
 
-//class members
+// Public class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
-    void choosen_gas_querry();
-    unsigned int prepare_bip();
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
+    unsigned int cp_const_data_aquisition();
+
 
 };
 
@@ -56,26 +67,20 @@ db_class:: db_class(const char* custom_filename)
     }
 
     // open the database in the constructor
-    Is_database_open = open_db();
+
+    int rc = sqlite3_open(database_filename.c_str(), &db);
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL error: " << sqlite3_errmsg(db) << '\n';
+        sqlite3_close(db);
+        Is_database_open = false;
+    }
+    else 
+       Is_database_open = true;
 }
 
 db_class:: ~db_class()
 {
-    std::cout<<"\ndestructor been called\n";
     sqlite3_close(db);
-}
-
-bool db_class:: open_db()
-{
-    int rc;
-    rc = sqlite3_open(database_filename.c_str(), &db);
-    if (rc != SQLITE_OK) {
-        std::cerr << "SQL error: " << sqlite3_errmsg(db) << '\n';
-        sqlite3_close(db);
-        return false;
-    }
-    else 
-       return true;
 }
 
 unsigned int db_class:: get_all_gas_names()
@@ -110,7 +115,13 @@ unsigned int db_class:: get_all_gas_names()
             return 1;
     }
 
-// this part interacts with the user
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+void db_class::choose_gas_from_user()
+{
+    // this part interacts with the user
     std::cout<<"Choose gas : (enter nuber comma seperated / to choose all just 1-last_gas_no )\n";
     unsigned int j=1;
     for(auto i: gas_names)
@@ -118,13 +129,14 @@ unsigned int db_class:: get_all_gas_names()
     
     std::cout<<"\n\nYour choices : ";
     std::getline(std::cin, gas_choices);
-
-    sqlite3_finalize(stmt);
-    return 0;
+    process_count++;
 }
 
 void db_class::gas_choice_str2Vec()
 {
+    if(process_count==0)
+        choose_gas_from_user();
+    
     // clean the string directly comparing with ACSII values
     for(auto& i : gas_choices){
         if(int(i)<44)
@@ -156,13 +168,15 @@ void db_class::gas_choice_str2Vec()
     if(j<=total_gas_in_db)
         gas_choice_id.insert(j);
 
+//DEBUG
     // for(const auto& i : gas_choice_id)
     //     std::cout<<"\t"<<i;
 }
 
-void db_class::choosen_gas_querry()
+unsigned int db_class::choosen_gas_bip_querry()
 {
-    gas_choice_str2Vec();
+    if(gas_choice_id.size()==0)
+        gas_choice_str2Vec();
 
     // querry
     // select gas_name, Hydrogen, Methane, Ammonia from bip where 
@@ -191,16 +205,21 @@ void db_class::choosen_gas_querry()
 
     querry.erase();
     querry = "select " + new_q + " from bip where (" + new_q1 + ')';
+
+// for DEBUGGING    
     // std::cout<<"\n\n"<<querry;
-    
+    return 0;
 }
 
 unsigned int db_class::prepare_bip()
 {
     if (!Is_database_open)
         return 2;
-    // TODO 2d array system using array again
-    choosen_gas_querry();
+
+    unsigned int res = choosen_gas_bip_querry();
+    if(res!=0)
+        return 2;
+
     sqlite3_stmt* stmt;
 
     std::size_t no_of_choices = gas_choice_id.size();
@@ -236,4 +255,32 @@ std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
         return std::move(bip_pointer);
     else
         return NULL;
+}
+
+unsigned int db_class::cp_const_data_aquisition()
+{
+    if(gas_choice_id.size() == 0)
+        gas_choice_str2Vec();
+
+    std::vector<CP_Const> cp_const_data(5);
+    querry.erase();
+    querry = "select * from c_ideal where gas_name=?";
+    sqlite3_stmt* stmt;
+
+    for(const auto& i : gas_choice_id){
+        sqlite3_prepare_v2(db, querry.c_str(), -1, &stmt, NULL);
+        sqlite3_bind_text(stmt, 1, gas_names[i-1].c_str(), -1, SQLITE_STATIC);
+        if (sqlite3_step(stmt) == 100){
+            CP_Const temp { (float)sqlite3_column_double(stmt, 2),
+                            (float)sqlite3_column_double(stmt, 3),
+                            (float)sqlite3_column_double(stmt, 4),
+                            (float)sqlite3_column_double(stmt, 5)};
+            cp_const_data.push_back(temp);
+        }
+        sqlite3_finalize(stmt);
+
+    }
+    for(const auto& i : cp_const_data){
+        std::cout<<i.A<<"\t"<<i.B<<"\t"<<i.C<<"\t"<<i.D<<"\n";
+    }
 }
