@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <set>
-#include <array>
+#include<memory>
 #include<iostream>
 
 class db_class
@@ -22,11 +22,12 @@ private:
     unsigned int total_gas_in_db = 0;
 
     std::set<unsigned int> gas_choice_id;
+
+    std::unique_ptr<std::vector<std::vector<float>>> bip_pointer;
 //class members
     bool open_db();
     ~db_class();
     void gas_choice_str2Vec();
-    void choosen_gas_querry();
     
 
 public:
@@ -35,7 +36,9 @@ public:
 //class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
+    void choosen_gas_querry();
     unsigned int prepare_bip();
+    std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
 
 };
 
@@ -66,8 +69,11 @@ bool db_class:: open_db()
 {
     int rc;
     rc = sqlite3_open(database_filename.c_str(), &db);
-    if(rc) 
-       return false;
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL error: " << sqlite3_errmsg(db) << '\n';
+        sqlite3_close(db);
+        return false;
+    }
     else 
        return true;
 }
@@ -164,33 +170,70 @@ void db_class::choosen_gas_querry()
 
     std::string new_q;
     std::string new_q1;
-    for(const auto& i : gas_choice_id){
-        new_q = new_q + gas_names[i-1] + ',';
-        new_q1 = new_q1 + "gas_name = '" + gas_names[i-1] + "' or ";
-    }
-    new_q[new_q.length() - 1] = 0;
+    /*** 
+     * I didnt know about iterators so I cretaed a new set in reverse order
+    //std::set<unsigned int, std::greater<unsigned int>> gas_choice_id_rev(gas_choice_id.begin(), gas_choice_id.end()); 
+    //for(const auto& i : gas_choice_id_rev)
+    ***/
+    for(auto i = gas_choice_id.rbegin(); i != gas_choice_id.rend(); i++)
+        new_q = new_q + gas_names[*i-1] + ',';
+
+    for(const auto& i : gas_choice_id)
+            new_q1 = new_q1 + "gas_name = '" + gas_names[i-1] + "' or ";
     
-    unsigned int l = new_q1.length();
-    new_q1[l - 1] = 0;
-    new_q1[l - 2] = 0;
-    new_q1[l - 3] = 0;
+    unsigned int l1 = new_q1.length();
+    unsigned int l2 = new_q.length();
+    new_q1.erase(l1-4,l1);
+    new_q.erase(l2-1,l2);
+
+    // std::cout<<"\n"<<new_q<<"\nlength : "<<new_q.length()<<"\n";
+    // std::cout<<"\n"<<new_q1<<"\nlength : "<<new_q1.length()<<"\n";
+
     querry.erase();
-    querry = "select " + new_q + " from bip where " + new_q1;
-    //std::cout<<"\n\n"<<querry;
+    querry = "select " + new_q + " from bip where (" + new_q1 + ')';
+    // std::cout<<"\n\n"<<querry;
+    
 }
 
 unsigned int db_class::prepare_bip()
 {
+    if (!Is_database_open)
+        return 2;
     // TODO 2d array system using array again
     choosen_gas_querry();
     sqlite3_stmt* stmt;
-    std::cout<<"\n"<<querry<<"\n";
-    sqlite3_prepare_v3(db, querry.c_str(), 200, SQLITE_PREPARE_PERSISTENT, &stmt, NULL);
-    // for(unsigned int i=0; i<total_gas_in_db; i++)
-    //     for(unsigned int j=0; j<total_gas_in_db; j++)
-            // if(sqlite3_step(stmt) == 100)
-            std::cout<<"\n"<<sqlite3_step(stmt)<<"\n";
-            std::cout<<sqlite3_column_type(stmt, 0);
-    
+
+    std::size_t no_of_choices = gas_choice_id.size();
+
+    std::vector<std::vector<float>> bip_arr(no_of_choices , std::vector<float>(no_of_choices));
+    bip_pointer = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
+
+    if(sqlite3_prepare_v2(db, querry.c_str(), -1, &stmt, NULL) == SQLITE_OK)
+        for(unsigned int i=0; i<no_of_choices; i++){
+            if(sqlite3_step(stmt) == 100)
+                for(unsigned int j=0; j<no_of_choices; j++)
+                    bip_arr[i][j] = (float)sqlite3_column_double(stmt, j);
+            else
+                return 1;
+        }
+    else
+        return 1;
+
+// print the bip data
+    for(const auto& i : bip_arr){
+        for(const auto& j : i)
+            std::cout<<j<<"\t";
+        std::cout<<"\n";}
+   
     return 0;
+}
+
+std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
+{
+    // unsigned int res = prepare_bip();
+    // if(res==0)
+    //     return bip_pointer;
+    // else
+    //     return NULL;
+    return std::move(bip_pointer);
 }

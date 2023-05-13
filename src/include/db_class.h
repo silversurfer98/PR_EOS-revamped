@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+#include<memory>
 class db_class
 {
 public:
@@ -6,7 +9,8 @@ public:
 //class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
-    unsigned int choosen_gas_querry();
+    void choosen_gas_querry();
     unsigned int prepare_bip();
+    std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
 
 };
