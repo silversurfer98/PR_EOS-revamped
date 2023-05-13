@@ -206,7 +206,6 @@ unsigned int db_class::prepare_bip()
     std::size_t no_of_choices = gas_choice_id.size();
 
     std::vector<std::vector<float>> bip_arr(no_of_choices , std::vector<float>(no_of_choices));
-    bip_pointer = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
 
     if(sqlite3_prepare_v2(db, querry.c_str(), -1, &stmt, NULL) == SQLITE_OK)
         for(unsigned int i=0; i<no_of_choices; i++){
@@ -219,21 +218,22 @@ unsigned int db_class::prepare_bip()
     else
         return 1;
 
+    bip_pointer = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
+
 // print the bip data
-    for(const auto& i : bip_arr){
-        for(const auto& j : i)
-            std::cout<<j<<"\t";
-        std::cout<<"\n";}
+    // for(const auto& i : bip_arr){
+    //     for(const auto& j : i)
+    //         std::cout<<j<<"\t";
+    //     std::cout<<"\n";}
    
     return 0;
 }
 
 std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
 {
-    // unsigned int res = prepare_bip();
-    // if(res==0)
-    //     return bip_pointer;
-    // else
-    //     return NULL;
-    return std::move(bip_pointer);
+    unsigned int res = prepare_bip();
+    if(res==0)
+        return std::move(bip_pointer);
+    else
+        return NULL;
 }

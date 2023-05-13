@@ -4,7 +4,7 @@ int main()
 {
     db_class mydbclass("props.db");
     unsigned int res = mydbclass.get_all_gas_names();
-    mydbclass.prepare_bip();
+    //mydbclass.prepare_bip();
     std::unique_ptr<std::vector<std::vector<float>>> bip = mydbclass.get_bip_pointer();
     //bip = mydbclass.get_bip_pointer();
 
@@ -16,6 +16,7 @@ int main()
         for(auto col = row->begin(); col != row->end(); ++col)
                 std::cout<<*col<<"\t";
             std::cout<<"\n";}}
+
     std::cout<<"\n main done\n\n";
 
     return 0;
