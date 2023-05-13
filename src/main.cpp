@@ -3,7 +3,8 @@
 int main()
 {
     db_class myclass("props.db");
-    unsigned int res = myclass.print_all_gas();
-    std::cout<<"\n\n res = "<<res;
+    unsigned int res = myclass.get_all_gas_names();
+    if(res==0)
+        myclass.prepare_bip();
     return 0;
 }
