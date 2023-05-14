@@ -1,5 +1,11 @@
 #include <vector>
 #include<memory>
+
+struct CP_Const
+{
+    float A, B, C, D;
+};
+
 class db_class
 {
 public:
@@ -8,13 +14,9 @@ public:
 //class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
+    unsigned int choose_gas_from_user();
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
-    unsigned int cp_const_data_aquisition();
+    std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
+    ~db_class();
 
-
-};
-
-struct CP_Const
-{
-    float A, B, C, D;
 };
