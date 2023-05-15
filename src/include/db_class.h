@@ -20,3 +20,27 @@ public:
     ~db_class();
 
 };
+
+
+
+// class db_access
+// {
+//     // if member func return 2 --> db is not open / constructor prob
+//     // if return 1 --> its the sqlite command fail
+// public:
+// // Public variables
+
+// // Public class members
+//     db_access(const char* custom_filename);
+//     unsigned int get_all_gas_names();
+//     unsigned int choose_gas_from_user();
+//     ~db_access();
+// };
+
+// class bip_matrix : private db_access
+// {
+// public:
+//     bip_matrix(const char* filename) : db_access(filename){}
+//     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
+
+// };
