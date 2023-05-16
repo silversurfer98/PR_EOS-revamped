@@ -1,22 +1,20 @@
 include_directories(..//include)
 # Define library sources
 set(LIB_SOURCES
-    db_class.cpp
+    pr_eos_class.cpp
 )
 
 link_directories(${CMAKE_BINARY_DIR}/libs)
 
-include_directories(../include)
-
 #compile into static
-add_library(db_class ${LIB_SOURCES})
+add_library(pr_eos_class ${LIB_SOURCES})
 
-target_link_libraries(db_class sqlite)
+target_link_libraries(pr_eos_class db_class)
 
 
 #add properties and export import lib
-set_target_properties(db_class PROPERTIES
+set_target_properties(pr_eos_class PROPERTIES
   LANGUAGE CXX
-  OUTPUT_NAME db_class
+  OUTPUT_NAME pr_eos_class
   ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libs
 )

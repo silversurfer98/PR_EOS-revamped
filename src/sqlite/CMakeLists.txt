@@ -1,5 +1,5 @@
 find_package(Threads REQUIRED)
-
+set(CMAKE_BUILD_TYPE Release)
 # Define library sources
 set(LIB_SOURCES
     sqlite3.c

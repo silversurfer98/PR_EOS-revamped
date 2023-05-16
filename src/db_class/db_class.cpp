@@ -6,10 +6,25 @@
 #include<memory>
 #include<iostream>
 
+// data structs
 struct CP_Const
 {
     float A, B, C, D;
 };
+
+//PR EOS properties definition
+struct PR_props
+{
+    float a, b, aa, bb, k, alpha, ac, c, d, e;
+};
+
+//gas base properties definition
+struct base_props
+{
+    float tc, pc, w;
+};
+
+
 
 class db_class
 {
@@ -33,10 +48,12 @@ private:
 
     std::unique_ptr<std::vector<CP_Const>> cp_const_vals;
 
+    std::unique_ptr<std::vector<base_props>> base_gas_props_ptr;
+
 // Private class members
     unsigned int prepare_bip();
     unsigned int cp_const_data_aquisition();
-
+    unsigned int get_base_gas_props();
     
 
 public:
@@ -48,7 +65,10 @@ public:
     unsigned int choose_gas_from_user();
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
+    std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
+
     ~db_class();
+
 
 };
 
@@ -210,10 +230,10 @@ unsigned int db_class::prepare_bip()
         second = second + "'" + all_gas_names_map[i] + "',";
 
     }
-    unsigned int le1 = front.length();
-    unsigned int le2 = second.length();
-    front.erase(le1-1,le1);
-    second.erase(le2-1,le2);
+    unsigned int le = front.length();
+    front.erase(le-1,le);
+    le = second.length();
+    second.erase(le-1,le);
 
     querry = "select " + front + " from bip where gas_name in (" + second + ") order by id ASC";
 
@@ -326,6 +346,75 @@ std::unique_ptr<std::vector<CP_Const>> db_class::get_cp_const_pointer()
         // for(auto i = cp_const_vals->begin(); i != cp_const_vals->end(); ++i) 
         //     std::cout<<"\n"<<i->A<<"\t"<<i->B<<"\t"<<i->C<<"\t"<<i->D<<"\n";
         return std::move(cp_const_vals);
+    // }
+    // else
+    //     return nullptr;
+}
+
+unsigned int db_class::get_base_gas_props()
+{
+    if(!is_set_created)
+        return 3;
+
+    std::vector<base_props> base_gas_props;
+    base_gas_props.reserve(5);
+
+
+    // prepare query
+    querry.erase();
+    // create querry
+    std::string second;
+    for(const auto& i : gas_choice_id)
+        second = second + "'" + all_gas_names_map[i] + "',";
+    
+    unsigned int le = second.length();
+    second.erase(le-1,le);
+    std::size_t no_of_choices = gas_choice_id.size();
+    querry = "select tc,pc,w from base_gas_prop where gas_name in (" + second + ") order by id ASC";
+
+    //open db
+    int rc = sqlite3_open(database_filename.c_str(), &db);
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL error: " << sqlite3_errmsg(db) << '\n';
+        sqlite3_close(db);
+        return 1;
+    }
+
+    //  make ready to querry db
+    sqlite3_stmt* stmt;
+    if(sqlite3_prepare_v2(db, querry.c_str(), -1, &stmt, NULL) == SQLITE_OK)
+        for(unsigned int i=0; i<no_of_choices; i++){
+            if(sqlite3_step(stmt) == 100){
+                base_props temp { (float)sqlite3_column_double(stmt, 0),
+                                  (float)sqlite3_column_double(stmt, 1),
+                                  (float)sqlite3_column_double(stmt, 2)};
+                base_gas_props.push_back(temp);
+            }
+                
+            else
+                return 2;
+        }
+    else
+        return 2;
+
+    // make a unique ptr for the data
+    base_gas_props_ptr = std::make_unique<std::vector<base_props>>(base_gas_props);
+
+    // DEBUGGING print the data
+    // std::cout<<"\n";
+    // for(const auto& i : base_gas_props)
+    //     std::cout<<"\n"<<i.tc<<"\t"<<i.pc<<"\t"<<i.w<<"\n";
+   
+    sqlite3_close(db);
+    return 0;
+}
+
+std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
+{
+     unsigned int res = get_base_gas_props();
+    // std::cout<<"\n\nres : "<<res<<"\n\n";
+    // if(res==0){
+        return std::move(base_gas_props_ptr);
     // }
     // else
     //     return nullptr;

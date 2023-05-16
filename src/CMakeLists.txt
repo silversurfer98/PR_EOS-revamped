@@ -15,6 +15,7 @@ endif()
 
 
 add_subdirectory(db_class)
+add_subdirectory(pr_eos_class)
 
 include_directories(include)
 
@@ -25,7 +26,8 @@ configure_file(..//assets//props.db ${CMAKE_BINARY_DIR}/bin/props.db COPYONLY)
 link_directories(${CMAKE_BINARY_DIR}/libs)
 
 set(SOURCE_FILES main.cpp)
+set(LINK_FILES db_class pr_eos_class)
 add_executable(final ${SOURCE_FILES})
 
-target_link_libraries(final db_class)
+target_link_libraries(final ${LINK_FILES})
 install(TARGETS final RUNTIME DESTINATION ${CMAKE_BINARY_DIR}/bin)

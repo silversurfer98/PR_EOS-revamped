@@ -1,4 +1,5 @@
 #include "db_class.h"
+#include "pr_eos_class.h"
 #include <iostream>
 int main()
 {
@@ -10,6 +11,7 @@ int main()
 
     std::unique_ptr<std::vector<std::vector<float>>> bip_ptr = mydbclass.get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> cp = mydbclass.get_cp_const_pointer();
+    std::unique_ptr<std::vector<base_props>> bp = mydbclass.get_base_gas_props_ptr();
 
 // print the bip data
 
@@ -23,7 +25,15 @@ int main()
     if(cp!=nullptr)
         for(auto i = cp->begin(); i != cp->end(); ++i) 
             std::cout<<"\n"<<i->A<<"\t"<<i->B<<"\t"<<i->C<<"\t"<<i->D<<"\n";
+
+    if(bp!=nullptr)
+        for(auto i = bp->begin(); i != bp->end(); ++i) 
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
+
     std::cout<<"\n main done\n\n";
+
+    pr_eos eos(std::move(bp));
+    eos.print_base();
 
     return 0;
 }
