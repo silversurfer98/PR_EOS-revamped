@@ -1,4 +1,4 @@
-# cmake . -G "MinGW Makefiles" -B ./build
+# cmake . -G "MinGW Makefiles" -B ../buildnr
 
 cmake_minimum_required(VERSION 3.0)
 project(newton_raphson)
