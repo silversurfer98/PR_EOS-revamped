@@ -26,8 +26,6 @@ float newton_raphson(float* initial_value,
         return Next_value;
 }
 
-
-
 bool newton_raphson_controlled(float* initial_value, 
                      float (*func)(float, std::shared_ptr<std::vector<float>>), 
                      float (*funcd)(float, std::shared_ptr<std::vector<float>>), 
@@ -52,5 +50,66 @@ bool newton_raphson_controlled(float* initial_value,
         else
             return true;
     }
+    return false;
+}
+
+
+
+                           
+bool weistrass_controlled(std::shared_ptr<std::vector<float>> initial_val, 
+                          float (*func)(float, std::shared_ptr<std::vector<float>>), 
+                          std::shared_ptr<std::vector<float>> parameters, 
+                          float tolerance,
+                          uint16_t controlled_iter)
+{
+    float temp = 1;
+    unsigned int success = 0;
+    unsigned int degree = (*initial_val).size();
+    float* z_new = new float[degree];
+    float* error = new float[degree];
+
+    for(unsigned int i=0;i<degree;i++)
+    {
+        (*initial_val)[i]=i*0.5;
+        z_new[i]=0.0;
+    }
+    
+// for loop implementation
+    uint16_t i = 0;
+    for(i=0;i<controlled_iter;i++)
+    {
+        success = 0;
+        for(unsigned int j=0;j<degree;j++)
+        {
+            temp = 1;
+            for(unsigned int z=0;z<degree;z++)
+                if(z!=j)
+                    temp = temp * ((*initial_val)[j]-(*initial_val)[z]);
+                    
+            z_new[j] = (*initial_val)[j] - (func((*initial_val)[j],parameters) / temp);
+            error[j] = (*initial_val)[j] - z_new[j];
+
+            *(int *)&error[j] = *(int *)&error[j] & 0b01111111111111111111111111111111;
+
+            (*initial_val)[j] = z_new[j];
+        }
+
+        for(unsigned int k=0;k<degree;k++)
+            if(error[k]<=tolerance)
+                success++;
+
+        if(success==degree)
+        {
+            delete[] z_new;
+            delete[] error;
+            for(unsigned int k=0;k<degree;k++)
+                (*initial_val)[k] = z_new[k];
+            return true;
+        }
+
+    }
+
+    delete[] z_new;
+    delete[] error;
     return false;
 }
