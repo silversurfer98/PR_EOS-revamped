@@ -14,30 +14,6 @@ float func_derv(float x, std::shared_ptr<std::vector<float>> parameters)
     return temp;
 }
 
-// float newton_raphson(float* initial_value, float (*func)(float, std::shared_ptr<std::vector<float>>), float (*funcd)(float), std::shared_ptr<std::vector<float>> parameters);
-// float Next_value = 0;
-
-// float newton_raphson(float* initial_value, float (*func)(float, std::shared_ptr<std::vector<float>>), float (*funcd)(float), std::shared_ptr<std::vector<float>> parameters)
-// {
-//     float Next_value = *initial_value - (func(*initial_value, parameters) / funcd(*initial_value));
-//     //report("Next value",Next_value);
-
-//     // to find the diff
-//     float diff = Next_value - *initial_value;
-
-//     // to null the minus sign --> finds abs of diff
-//     // if (diff < 0) diff = diff * -1;
-//     *(int *)&diff = *(int *)&diff & 0b01111111111111111111111111111111;
-//     //std::cout<<count;  
-//     //report("diff",diff);
-
-//     if(diff >= 0.01)
-//     {
-//         newton_raphson(&Next_value, (*func), (*funcd), parameters);
-//     }
-//     else
-//         return Next_value;
-// }
 int main()
 {
     std::vector<float> parameters;
@@ -56,6 +32,9 @@ int main()
 
     std::cout<<"ans : "<<fun(0,ptr);
     std::cout<<"\nans : "<<ans;
+    f = 1.0;
+    if(newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50))
+        std::cout<<"\nans from controlled : "<<f;
     std::cout<<"\n\nmain";
     return 0;
 }
