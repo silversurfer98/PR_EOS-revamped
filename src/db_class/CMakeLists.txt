@@ -6,8 +6,6 @@ set(LIB_SOURCES
 
 link_directories(${CMAKE_BINARY_DIR}/libs)
 
-include_directories(../include)
-
 #compile into static
 add_library(db_class ${LIB_SOURCES})
 

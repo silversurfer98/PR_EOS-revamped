@@ -18,7 +18,9 @@ private:
 
 public:
 // public variables
-    pr_eos(std::unique_ptr<std::vector<base_props>>);
-    void print_base();
+
 // public member funcs
+    pr_eos(float pressure, float temperature, const char* db_name);
+    void print_base();
+
 };

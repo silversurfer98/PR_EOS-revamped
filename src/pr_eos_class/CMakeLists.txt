@@ -9,7 +9,7 @@ link_directories(${CMAKE_BINARY_DIR}/libs)
 #compile into static
 add_library(pr_eos_class ${LIB_SOURCES})
 
-target_link_libraries(pr_eos_class db_class)
+target_link_libraries(pr_eos_class db_class math)
 
 
 #add properties and export import lib

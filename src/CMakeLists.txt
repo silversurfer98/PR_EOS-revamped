@@ -15,6 +15,7 @@ endif()
 
 
 add_subdirectory(db_class)
+add_subdirectory(math)
 add_subdirectory(pr_eos_class)
 
 include_directories(include)

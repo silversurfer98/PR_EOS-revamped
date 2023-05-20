@@ -11,7 +11,8 @@ int main()
 
     std::unique_ptr<std::vector<std::vector<float>>> bip_ptr = mydbclass.get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> cp = mydbclass.get_cp_const_pointer();
-    std::unique_ptr<std::vector<base_props>> bp = mydbclass.get_base_gas_props_ptr();
+    std::unique_ptr<std::vector<base_props>> bp;
+    bp = mydbclass.get_base_gas_props_ptr();
 
 // print the bip data
 
@@ -32,10 +33,16 @@ int main()
 
     std::cout<<"\n main done\n\n";
 
-    pr_eos eos(std::move(bp));
+    pr_eos eos(2, 370, "props.db");
     eos.print_base();
 
     return 0;
 }
 
+int mmain()
+{
+    pr_eos eos(2, 370, "props.db");
+    eos.print_base();
+    return 0;
+}
 // one thing can be done open db again and again for each operations
