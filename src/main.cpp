@@ -1,7 +1,7 @@
 #include "db_class.h"
 #include "pr_eos_class.h"
 #include <iostream>
-int main()
+int mmain()
 {
     db_class mydbclass("props.db");
     // unsigned int res = mydbclass.get_all_gas_names();
@@ -11,7 +11,7 @@ int main()
 
     std::unique_ptr<std::vector<std::vector<float>>> bip_ptr = mydbclass.get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> cp = mydbclass.get_cp_const_pointer();
-    std::unique_ptr<std::vector<base_props>> bp;
+    std::shared_ptr<std::vector<base_props>> bp;
     bp = mydbclass.get_base_gas_props_ptr();
 
 // print the bip data
@@ -33,16 +33,15 @@ int main()
 
     std::cout<<"\n main done\n\n";
 
-    pr_eos eos(2, 370, "props.db");
-    eos.print_base();
-
     return 0;
 }
 
-int mmain()
+int main()
 {
     pr_eos eos(2, 370, "props.db");
     eos.print_base();
+    eos.omale();
+    std::cout<<"otha";
     return 0;
 }
 // one thing can be done open db again and again for each operations

@@ -49,6 +49,7 @@ private:
     std::unique_ptr<std::vector<CP_Const>> cp_const_vals;
 
     std::unique_ptr<std::vector<base_props>> base_gas_props_ptr;
+    // std::shared_ptr<std::vector<base_props>> base_gas_props_ptr;
 
 // Private class members
     unsigned int prepare_bip();
@@ -66,6 +67,9 @@ public:
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
+    void new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr);
+
+    // std::shared_ptr<std::vector<base_props>> get_base_gas_props_ptr();
 
     ~db_class();
 
@@ -98,7 +102,7 @@ db_class:: db_class(const char* custom_filename)
 
 db_class:: ~db_class()
 {
-    std::cout<<"\n\nDestructor has been called\n\n";
+    std::cout<<"\n\nDB_class destructor has been called\n\n";
     // sqlite3_close(db);
 }
 
@@ -399,6 +403,7 @@ unsigned int db_class::get_base_gas_props()
 
     // make a unique ptr for the data
     base_gas_props_ptr = std::make_unique<std::vector<base_props>>(base_gas_props);
+    // base_gas_props_ptr = std::make_shared<std::vector<base_props>>(base_gas_props);
 
     // DEBUGGING print the data
     // std::cout<<"\n";
@@ -409,13 +414,21 @@ unsigned int db_class::get_base_gas_props()
     return 0;
 }
 
+// std::shared_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 {
      unsigned int res = get_base_gas_props();
     // std::cout<<"\n\nres : "<<res<<"\n\n";
     // if(res==0){
         return std::move(base_gas_props_ptr);
+        // return base_gas_props_ptr;
     // }
     // else
     //     return nullptr;
+}
+
+void db_class::new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr)
+{
+    unsigned int res = get_base_gas_props();
+    ptr = std::move(base_gas_props_ptr);
 }

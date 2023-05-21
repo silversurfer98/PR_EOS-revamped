@@ -29,6 +29,8 @@ public:
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
+    void new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr);
+    // std::shared_ptr<std::vector<base_props>> get_base_gas_props_ptr();
     ~db_class();
 
 
