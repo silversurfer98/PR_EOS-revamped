@@ -38,16 +38,16 @@ int mmain()
 
 int main()
 {
-    {
-    db_class mydbclass("props.db");
-    mydbclass.get_all_gas_names();
-    mydbclass.choose_gas_from_user();
-    std::unique_ptr<std::vector<base_props>> bp;
-    bp = mydbclass.get_base_gas_props_ptr();
-    if(bp)
-        for(auto i = bp->begin(); i != bp->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
-    }
+    // {
+    // db_class mydbclass("props.db");
+    // mydbclass.get_all_gas_names();
+    // mydbclass.choose_gas_from_user();
+    // std::unique_ptr<std::vector<base_props>> bp;
+    // bp = mydbclass.get_base_gas_props_ptr();
+    // if(bp)
+        // for(auto i = bp->begin(); i != bp->end(); ++i) 
+            // std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
+    // }
 
     pr_eos eos(2, 370, "props.db");
     eos.test();

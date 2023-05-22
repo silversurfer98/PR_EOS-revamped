@@ -19,7 +19,7 @@ private:
     const char* db_name;
 // private member funcs
     void pr_mix_report(PR_props* pr);
-    db_class mydbclass;
+    db_class* mydbclass;
 
 public:
 // public variables
@@ -33,13 +33,21 @@ public:
 
 };
 
-pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
+pr_eos::pr_eos(float pressure, float temperature, const char* db_n) // : mydbclass("props.db")
 {
     p = pressure;
     t = temperature;
-    // db_name = db_n;
-    
-    
+    db_name = db_n;
+    mydbclass = new db_class(db_name);
+    unsigned int res = mydbclass->get_all_gas_names();
+    if(res==0)
+        res = mydbclass->choose_gas_from_user();
+    std::cout<<"\n\n res = "<<res<<"\n\n";
+    // mydbclass.new_base_gas_props_ptr(base_data_pt);
+    // if(base_data_pt)
+        // for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
+            // std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
+
     // base_data_pt = std::make_unique<std::vector<base_props>>(base_data);
 
 }
@@ -47,14 +55,12 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
 pr_eos::~pr_eos()
 {
     std::cout<<"\n\nPR_EOS destructor has been called\n\n";
+    delete mydbclass;
 }
 
 int pr_eos::test()
 {
-    unsigned int res = mydbclass.get_all_gas_names();
-    if(res==0)
-        res = mydbclass.choose_gas_from_user();
-    std::cout<<"\n\n res = "<<res<<"\n\n";
+    std::cout<<"\n\nilla enakku puriyala\n\n";
     // db_class mydbclass(db_name);
     // unsigned int res = mydbclass.get_all_gas_names();
     // if(res==0)
