@@ -70,8 +70,8 @@ public:
     void new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr);
 
     // std::shared_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-
-    ~db_class();
+    unsigned int new_get_base_gas_props(std::unique_ptr<std::vector<base_props>>& base_gas_props_pt);
+    virtual ~db_class();
 
 
 };
@@ -79,6 +79,7 @@ public:
 //db_class:: db_class(std::string custom_filename)
 db_class:: db_class(const char* custom_filename)
 {
+    std::cout<<"\nDB_class constructor has been called\n";
     std::string custom_filename_str = custom_filename;
     if(database_filename != custom_filename_str)
     {
@@ -431,4 +432,11 @@ void db_class::new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& 
 {
     unsigned int res = get_base_gas_props();
     ptr = std::move(base_gas_props_ptr);
+}
+
+// --------------------- new implementation ---------------------------- //
+
+unsigned int new_get_base_gas_props(std::unique_ptr<std::vector<base_props>>& base_gas_props_pt)
+{
+    return 0;
 }

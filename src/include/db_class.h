@@ -31,7 +31,8 @@ public:
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
     void new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr);
     // std::shared_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-    ~db_class();
+    unsigned int new_get_base_gas_props(std::unique_ptr<std::vector<base_props>>& base_gas_props_pt);
+    virtual ~db_class();
 
 
 };

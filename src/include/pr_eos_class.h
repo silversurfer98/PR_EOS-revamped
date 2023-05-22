@@ -23,6 +23,6 @@ public:
     pr_eos(float pressure, float temperature, const char* db_name);
     void print_base();
     ~pr_eos();
-    int omale();
+    int test();
 
 };
