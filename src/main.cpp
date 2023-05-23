@@ -50,8 +50,8 @@ int main()
     // }
 
     pr_eos eos(2, 370, "props.db");
-    eos.test();
-    eos.print_base();
+    eos.print_base_data();
+    eos.print_bip_data();
     std::cout<<"\nEnd of main\n";
     return 0;
 }

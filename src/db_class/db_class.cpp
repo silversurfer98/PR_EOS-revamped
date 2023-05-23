@@ -49,7 +49,6 @@ private:
     std::unique_ptr<std::vector<CP_Const>> cp_const_vals;
 
     std::unique_ptr<std::vector<base_props>> base_gas_props_ptr;
-    // std::shared_ptr<std::vector<base_props>> base_gas_props_ptr;
 
 // Private class members
     unsigned int prepare_bip();
@@ -59,6 +58,8 @@ private:
 
 public:
 // Public variables
+    bool is_mix = true;
+    unsigned int size_of_gas_data = 1;
 
 // Public class members
     db_class(const char* custom_filename);
@@ -67,12 +68,7 @@ public:
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-    void new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr);
-
-    // std::shared_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-    unsigned int new_get_base_gas_props(std::unique_ptr<std::vector<base_props>>& base_gas_props_pt);
     virtual ~db_class();
-
 
 };
 
@@ -201,6 +197,7 @@ unsigned int db_class::choose_gas_from_user()
         items.erase();
     }
 
+    // after loop the item contains last element of gas_choice string
     int j = stoi(items);
     if(j<=total_gas_in_db)
         gas_choice_id.insert(j);
@@ -211,6 +208,11 @@ unsigned int db_class::choose_gas_from_user()
 
     // once set created set flag true
     is_set_created = true;
+    size_of_gas_data = gas_choice_id.size();
+    if(size_of_gas_data == 1){
+        std::cout<<"single gas";
+        is_mix = false;
+    }
     return 0;
 }
 
@@ -223,6 +225,8 @@ unsigned int db_class::prepare_bip()
     if(!is_set_created)
         return 3;
 
+    if(!is_mix)
+        return 4;
     // querry
     //select gas_name,Argon,CO2,CO,H2O,Methane from bip where gas_name 
     //in ('Argon','CO2','CO','H2O','Methane') order by id ASC
@@ -286,10 +290,10 @@ std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
 {
     unsigned int res = prepare_bip();
     // std::cout<<"\n\nres : "<<res<<"\n\n";
-    // if(res==0)
+    if(res==0)
         return std::move(bip_pointer);
-    // else
-    //     return nullptr;
+    else
+        return 0;
 }
 
 unsigned int db_class::cp_const_data_aquisition()
@@ -347,13 +351,10 @@ std::unique_ptr<std::vector<CP_Const>> db_class::get_cp_const_pointer()
 {
     unsigned int res = cp_const_data_aquisition();
     // std::cout<<"\n\nres : "<<res<<"\n\n";
-    // if(res==0){
-        // for(auto i = cp_const_vals->begin(); i != cp_const_vals->end(); ++i) 
-        //     std::cout<<"\n"<<i->A<<"\t"<<i->B<<"\t"<<i->C<<"\t"<<i->D<<"\n";
+    if(res==0)
         return std::move(cp_const_vals);
-    // }
-    // else
-    //     return nullptr;
+    else
+        return 0;
 }
 
 unsigned int db_class::get_base_gas_props()
@@ -404,7 +405,6 @@ unsigned int db_class::get_base_gas_props()
 
     // make a unique ptr for the data
     base_gas_props_ptr = std::make_unique<std::vector<base_props>>(base_gas_props);
-    // base_gas_props_ptr = std::make_shared<std::vector<base_props>>(base_gas_props);
 
     // DEBUGGING print the data
     // std::cout<<"\n";
@@ -415,28 +415,12 @@ unsigned int db_class::get_base_gas_props()
     return 0;
 }
 
-// std::shared_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 {
      unsigned int res = get_base_gas_props();
     // std::cout<<"\n\nres : "<<res<<"\n\n";
-    // if(res==0){
+    if(res==0)
         return std::move(base_gas_props_ptr);
-        // return base_gas_props_ptr;
-    // }
-    // else
-    //     return nullptr;
-}
-
-void db_class::new_base_gas_props_ptr(std::unique_ptr<std::vector<base_props>>& ptr)
-{
-    unsigned int res = get_base_gas_props();
-    ptr = std::move(base_gas_props_ptr);
-}
-
-// --------------------- new implementation ---------------------------- //
-
-unsigned int new_get_base_gas_props(std::unique_ptr<std::vector<base_props>>& base_gas_props_pt)
-{
-    return 0;
+    else
+        return 0;
 }
