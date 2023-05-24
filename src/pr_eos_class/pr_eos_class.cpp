@@ -20,15 +20,18 @@ private:
     std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
     bool Is_mix = true;
     unsigned int size_of_gas_data = 1;
+    PR_props pr_ans;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
-    void construct_pr_props();
+    void PR_consts_Calc_mix();
 
 public:
 // public variables
     db_class mydbclass;
+    void construct_pr_props();
+    std::vector<PR_props> pr_data;
 
 // public member funcs
     pr_eos(float pressure, float temperature, const char* db_name);
@@ -111,6 +114,14 @@ void pr_eos::construct_pr_props()
     // to implement, 
     // create pr_props vector
     // iterate through each base_gas_data and send to PR_const calc func
+    pr_data.reserve(5);
+    if(base_data_pt)
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            PR_props ans;
+            PR_consts_Calc(&(*i), &ans);
+            pr_data.push_back(ans);
+            pr_mix_report(&ans);
+        }
 }
 
 void pr_eos::pr_mix_report(PR_props* pr)
@@ -125,4 +136,40 @@ void pr_eos::pr_mix_report(PR_props* pr)
     std::cout << "\n C = " << pr->c;
     std::cout << "\n D = " << pr->d;
     std::cout << "\n E = " << pr->e << "\n";
+}
+
+void pr_eos::PR_consts_Calc_mix()
+{
+// only logic is here dont compile
+
+/***
+    for (unsigned int i = 0; i < 10; i++)
+        for (unsigned int j = 0; j < 10; j++)
+            aij[i][j] = sqrt(prmix[i].a * prmix[j].a) * (1 - binaryint_parameters[i][j]);
+
+    for (unsigned int i = 0; i < 10; i++)
+        for (unsigned int j = 0; j < 10; j++)
+            axij[i][j] = x[i] * x[j] * (aij[i][j]);
+
+    for (unsigned int i = 0; i < 10; i++)
+        bi[i] = x[i] * prmix[i].b;
+
+
+    for (unsigned int i = 0; i < 10; i++)
+        for (unsigned int j = 0; j < 10; j++)
+            pr_ans.a = pr_ans.a + axij[i][j];
+
+    for (unsigned int i = 0; i < 10; i++)
+        pr_ans.b = pr_ans.b + bi[i];
+
+    pr_ans.aa = pr_ans.a * gas1[0].p / (r * r * gas1[0].t * gas1[0].t);  //A constant fpr Z-equation
+    pr_ans.bb = pr_ans.b * gas1[0].p / (r * gas1[0].t);  //B constant fpr Z-equation
+***/
+    pr_ans.c = (1 - pr_ans.bb);
+    pr_ans.d = (pr_ans.aa - 2 * pr_ans.bb - 3 * pr_ans.bb * pr_ans.bb);
+    pr_ans.e = (pr_ans.aa * pr_ans.bb - pr_ans.bb * pr_ans.bb - pr_ans.bb * pr_ans.bb * pr_ans.bb);
+
+    std::cout<<"mix gas results ------> \n";
+    pr_mix_report(&pr_ans);
+    std::cout<<"\n----------------------> \n";
 }

@@ -11,4 +11,6 @@ public:
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
+    void construct_pr_props();
+
 };

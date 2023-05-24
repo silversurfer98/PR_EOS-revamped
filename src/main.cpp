@@ -52,6 +52,7 @@ int main()
     pr_eos eos(2, 370, "props.db");
     eos.print_base_data();
     eos.print_bip_data();
+    eos.construct_pr_props();
     std::cout<<"\nEnd of main\n";
     return 0;
 }
