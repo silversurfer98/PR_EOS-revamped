@@ -49,6 +49,8 @@ private:
     std::unique_ptr<std::vector<CP_Const>> cp_const_vals;
 
     std::unique_ptr<std::vector<base_props>> base_gas_props_ptr;
+    unsigned int size_of_gas_data = 1;
+    bool is_mix = true;
 
 // Private class members
     unsigned int prepare_bip();
@@ -59,13 +61,12 @@ private:
 
 public:
 // Public variables
-    unsigned int size_of_gas_data = 1;
-    bool is_mix = true;
 
 // Public class members
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
     unsigned int choose_gas_from_user();
+    unsigned int get_no_of_gases();
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
@@ -210,15 +211,18 @@ unsigned int db_class::choose_gas_from_user()
     // once set created set flag true
     is_set_created = true;
     size_of_gas_data = gas_choice_id.size();
-    std::cout<<"size of gase choice = "<<size_of_gas_data<<"\n\n";
+    // std::cout<<"size of gase choice = "<<size_of_gas_data<<"\n\n";
     if(size_of_gas_data == 1){
-        std::cout<<"single gas";
+        // std::cout<<"single gas";
         is_mix = false;
     }
     // return size_of_gas_data;
     return 0;
 }
 
+unsigned int db_class::get_no_of_gases(){
+    return size_of_gas_data;
+}
 
 unsigned int db_class::prepare_bip()
 {

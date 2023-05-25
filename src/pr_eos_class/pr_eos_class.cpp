@@ -51,14 +51,16 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
     if(res==0)
         res = mydbclass.choose_gas_from_user();
     
-    Is_mix = mydbclass.is_mix;
-    // std::cout<<"\n\n res = "<<res<<"\n\n";
+    size_of_gas_data = mydbclass.get_no_of_gases();
+    std::cout<<"size of gase choice = "<<size_of_gas_data<<"\n\n";
+
+    if(size_of_gas_data == 1)
+        Is_mix = false;
+    
     base_data_pt = mydbclass.get_base_gas_props_ptr();
 
-    if(Is_mix){
+    if(Is_mix)
         bip_data_ptr = mydbclass.get_bip_pointer();
-        size_of_gas_data = mydbclass.size_of_gas_data;
-    }
 }
 
 pr_eos::~pr_eos()
@@ -90,6 +92,7 @@ void pr_eos::print_bip_data()
 
 void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 {
+    // pressure unit is Mpa
     prprops->k = 0.37464 + (1.54226 * gas_prop->w) - (0.26992 * pow(gas_prop->w ,2)); //the m-constant
     prprops->ac = (0.4572355289 * pow(r * gas_prop->tc, 2)) / (gas_prop->pc * 0.000001);  // preliminary PREOS a constant
     prprops->alpha = (1 + prprops->k * (1 - sqrt(t / gas_prop->tc))) * (1 + prprops->k * (1 - sqrt(t / gas_prop->tc)));
@@ -140,37 +143,32 @@ void pr_eos::pr_mix_report(PR_props* pr)
 
 void pr_eos::PR_consts_Calc_mix()
 {
-// only logic is here dont compile
 
-    // std::vector<std::vector<float>> aij;
-    std::vector<std::vector<float>> axij;
-    std::vector<float> bi;
-
-    // aij.reserve(size_of_gas_data);
-    axij.reserve(size_of_gas_data);
-    bi.reserve(size_of_gas_data);
-
-    // for (unsigned int i = 0; i < size_of_gas_data; i++)
-        // for (unsigned int j = 0; j < size_of_gas_data; j++)
-            // aij[i][j] = sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]);
-
+    float t1, t2;
     for (unsigned int i = 0; i < size_of_gas_data; i++){
-        for (unsigned int j = 0; j < size_of_gas_data; j++){
-            axij[i][j] = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * (sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]));
-            std::cout<<axij[i][j]<<"\t";
+        for (unsigned int j = 0; j < size_of_gas_data; j++)
+        {
+            t1 = sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]);
+            t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
+        
+            // print matrix - DEBUG
+            // std::cout<<t2<<"\t";
+
+            pr_ans.a = pr_ans.a + t2;
         }
         std::cout<<"\n";
-    }
-    for (unsigned int i = 0; i < size_of_gas_data; i++)
-        bi[i] = (*base_data_pt)[i].xi * pr_data[i].b;
+        }
 
     for (unsigned int i = 0; i < size_of_gas_data; i++)
-        for (unsigned int j = 0; j < size_of_gas_data; j++)
-            pr_ans.a = pr_ans.a + axij[i][j];
+        pr_ans.b = pr_ans.b + (*base_data_pt)[i].xi * pr_data[i].b;
 
-    for (unsigned int i = 0; i < size_of_gas_data; i++)
-        pr_ans.b = pr_ans.b + bi[i];
 
+    // set these values to 0
+    pr_ans.k = 0;
+    pr_ans.ac = 0;
+    pr_ans.alpha = 0;
+
+    // these are the results to solve for Z
     pr_ans.aa = pr_ans.a * p / (r * r * t * t);  // A constant for Z-equation
     pr_ans.bb = pr_ans.b * p / (r * t);          // B constant for Z-equation
 
@@ -178,7 +176,7 @@ void pr_eos::PR_consts_Calc_mix()
     pr_ans.d = (pr_ans.aa - 2 * pr_ans.bb - 3 * pr_ans.bb * pr_ans.bb);
     pr_ans.e = (pr_ans.aa * pr_ans.bb - pr_ans.bb * pr_ans.bb - pr_ans.bb * pr_ans.bb * pr_ans.bb);
 
-    std::cout<<"mix gas results ------> \n";
+    std::cout<<"\n\nmix gas results ------> \n";
     pr_mix_report(&pr_ans);
     std::cout<<"\n----------------------> \n";
 }
