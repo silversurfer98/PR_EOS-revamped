@@ -15,41 +15,39 @@ class pr_eos
 private:
 // private variable
     float p=1, t=273.15;
-    const char* db_name;
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
-    bool Is_mix = true;
-    unsigned int size_of_gas_data = 1;
     PR_props pr_ans;
+    std::vector<PR_props> pr_data;
+    unsigned int size_of_gas_data = 1;
+    bool Is_mix = true;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
-    void PR_consts_Calc_mix();
 
 public:
 // public variables
     db_class mydbclass;
-    void construct_pr_props();
-    std::vector<PR_props> pr_data;
 
 // public member funcs
     pr_eos(float pressure, float temperature, const char* db_name);
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-
+    void construct_pr_props();
+    void PR_consts_Calc_mix();
 };
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
 {
-    p = pressure;
-    t = temperature;
-    db_name = db_n;
+    p = pressure*0.1 - 0.101325;
+    // p = 0.000001 * (pressure*100000 - 101325);
+    t = temperature + 273.15;
     // db_class* mydbclass;
     // db_class mydbclass{db_name};
     // mydbclass = new db_class(db_name);
-    unsigned int res = mydbclass.get_all_gas_names();
+        unsigned int res = mydbclass.get_all_gas_names();
     if(res==0)
         res = mydbclass.choose_gas_from_user();
     
@@ -92,12 +90,12 @@ void pr_eos::print_bip_data()
 
 void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 {
-    prprops->k = 0.37464 + 1.54226 * gas_prop->w - 0.26992 * gas_prop->w * gas_prop->w; //the m-constant
-    prprops->ac = (0.45723553 * r * r * gas_prop->tc * gas_prop->tc) / gas_prop->pc;  // preliminary PREOS a constant
-    prprops->alpha = (1 + prprops->k * (1 - sqrt(t/ gas_prop->tc))) * (1 + prprops->k * (1 - sqrt(t/ gas_prop->tc)));
+    prprops->k = 0.37464 + (1.54226 * gas_prop->w) - (0.26992 * pow(gas_prop->w ,2)); //the m-constant
+    prprops->ac = (0.4572355289 * pow(r * gas_prop->tc, 2)) / (gas_prop->pc * 0.000001);  // preliminary PREOS a constant
+    prprops->alpha = (1 + prprops->k * (1 - sqrt(t / gas_prop->tc))) * (1 + prprops->k * (1 - sqrt(t / gas_prop->tc)));
 
     prprops->a = prprops->ac * prprops->alpha;  //refined a-constant PREOS   cm6-pascal/mol2
-    prprops->b = (0.077796074 * r * gas_prop->tc) / gas_prop->pc; //b-constant PREOS   cm3/mol
+    prprops->b = (0.077796074 * r * gas_prop->tc) / (gas_prop->pc * 0.000001); //b-constant PREOS   cm3/mol
 
     prprops->aa = prprops->a * p / (r * r * t* t);  //A constant fpr Z-equation
     prprops->bb = prprops->b * p / (r * t);  //B constant fpr Z-equation
@@ -144,32 +142,35 @@ void pr_eos::PR_consts_Calc_mix()
 {
 // only logic is here dont compile
 
-    std::vector<std::vector<float>> aij;
+    // std::vector<std::vector<float>> aij;
     std::vector<std::vector<float>> axij;
     std::vector<float> bi;
 
-    aij.reserve(size_of_gas_data);
+    // aij.reserve(size_of_gas_data);
     axij.reserve(size_of_gas_data);
     bi.reserve(size_of_gas_data);
-/***
-    for (unsigned int i = 0; i < 10; i++)
-        for (unsigned int j = 0; j < 10; j++)
-            aij[i][j] = sqrt(prmix[i].a * prmix[j].a) * (1 - binaryint_parameters[i][j]);
 
-    for (unsigned int i = 0; i < 10; i++)
-        for (unsigned int j = 0; j < 10; j++)
-            axij[i][j] = x[i] * x[j] * (aij[i][j]);
+    // for (unsigned int i = 0; i < size_of_gas_data; i++)
+        // for (unsigned int j = 0; j < size_of_gas_data; j++)
+            // aij[i][j] = sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]);
 
-    for (unsigned int i = 0; i < 10; i++)
-        bi[i] = x[i] * prmix[i].b;
+    for (unsigned int i = 0; i < size_of_gas_data; i++){
+        for (unsigned int j = 0; j < size_of_gas_data; j++){
+            axij[i][j] = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * (sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]));
+            std::cout<<axij[i][j]<<"\t";
+        }
+        std::cout<<"\n";
+    }
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
+        bi[i] = (*base_data_pt)[i].xi * pr_data[i].b;
 
-    for (unsigned int i = 0; i < 10; i++)
-        for (unsigned int j = 0; j < 10; j++)
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
+        for (unsigned int j = 0; j < size_of_gas_data; j++)
             pr_ans.a = pr_ans.a + axij[i][j];
 
-    for (unsigned int i = 0; i < 10; i++)
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
         pr_ans.b = pr_ans.b + bi[i];
-***/
+
     pr_ans.aa = pr_ans.a * p / (r * r * t * t);  // A constant for Z-equation
     pr_ans.bb = pr_ans.b * p / (r * t);          // B constant for Z-equation
 

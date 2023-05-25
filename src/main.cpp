@@ -49,10 +49,11 @@ int main()
             // std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
     // }
 
-    pr_eos eos(2, 370, "props.db");
+    pr_eos eos(2, 120, "props.db");
     eos.print_base_data();
-    eos.print_bip_data();
+    // eos.print_bip_data();
     eos.construct_pr_props();
+    eos.PR_consts_Calc_mix();
     std::cout<<"\nEnd of main\n";
     return 0;
 }

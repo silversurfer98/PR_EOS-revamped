@@ -59,8 +59,8 @@ private:
 
 public:
 // Public variables
-    bool is_mix = true;
     unsigned int size_of_gas_data = 1;
+    bool is_mix = true;
 
 // Public class members
     db_class(const char* custom_filename);
@@ -210,10 +210,12 @@ unsigned int db_class::choose_gas_from_user()
     // once set created set flag true
     is_set_created = true;
     size_of_gas_data = gas_choice_id.size();
+    std::cout<<"size of gase choice = "<<size_of_gas_data<<"\n\n";
     if(size_of_gas_data == 1){
         std::cout<<"single gas";
         is_mix = false;
     }
+    // return size_of_gas_data;
     return 0;
 }
 
@@ -444,12 +446,12 @@ bool db_class::get_comp()
 std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 {
      unsigned int res = get_base_gas_props();
+    // std::cout<<"\n\nres : "<<res<<"\n\n";
     if(res==0){
-        bool run = true;
-        while(run){
-            run = !get_comp();
-        }
-        return std::move(base_gas_props_ptr);
+        bool t = get_comp();
+        while(!t)
+            t = get_comp();
+        return std::move(base_gas_props_ptr);        
     }
     else
         return 0;

@@ -12,5 +12,5 @@ public:
     void print_base_data();
     void print_bip_data();
     void construct_pr_props();
-
+    void PR_consts_Calc_mix();
 };
