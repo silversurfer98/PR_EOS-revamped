@@ -21,7 +21,7 @@ struct PR_props
 //gas base properties definition
 struct base_props
 {
-    float tc, pc, w;
+    float tc, pc, w, xi = 0;
 };
 
 
@@ -54,6 +54,7 @@ private:
     unsigned int prepare_bip();
     unsigned int cp_const_data_aquisition();
     unsigned int get_base_gas_props();
+    bool get_comp();
     
 
 public:
@@ -393,7 +394,7 @@ unsigned int db_class::get_base_gas_props()
             if(sqlite3_step(stmt) == 100){
                 base_props temp { (float)sqlite3_column_double(stmt, 0),
                                   (float)sqlite3_column_double(stmt, 1),
-                                  (float)sqlite3_column_double(stmt, 2)};
+                                  (float)sqlite3_column_double(stmt, 2), 0};
                 base_gas_props.push_back(temp);
             }
                 
@@ -415,12 +416,41 @@ unsigned int db_class::get_base_gas_props()
     return 0;
 }
 
+bool db_class::get_comp()
+{
+    bool is_ok = true;
+    // need to get conc from the use
+    unsigned int j=0;
+    std::cout<<"\n\n";
+    for(const auto& i : gas_choice_id){
+        std::cout<<"Enter the composition of "<<all_gas_names_map[i]<<" : ";
+        std::cin>>(*base_gas_props_ptr)[j].xi;
+        j++;
+    }
+
+    float sum = 0;
+    for(auto i = base_gas_props_ptr->begin(); i != base_gas_props_ptr->end(); ++i) {
+        sum = sum + i->xi;
+        if(sum>1){
+            is_ok = false;
+            std::cout<<"\nSum exceeds 1, enter the composition again \n";
+            break;
+        }
+    }
+
+    return is_ok;
+}
+
 std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 {
      unsigned int res = get_base_gas_props();
-    // std::cout<<"\n\nres : "<<res<<"\n\n";
-    if(res==0)
+    if(res==0){
+        bool run = true;
+        while(run){
+            run = !get_comp();
+        }
         return std::move(base_gas_props_ptr);
+    }
     else
         return 0;
 }

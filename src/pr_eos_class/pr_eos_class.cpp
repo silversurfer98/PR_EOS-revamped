@@ -120,6 +120,8 @@ void pr_eos::construct_pr_props()
             PR_props ans;
             PR_consts_Calc(&(*i), &ans);
             pr_data.push_back(ans);
+            
+            // print data
             pr_mix_report(&ans);
         }
 }
@@ -142,6 +144,13 @@ void pr_eos::PR_consts_Calc_mix()
 {
 // only logic is here dont compile
 
+    std::vector<std::vector<float>> aij;
+    std::vector<std::vector<float>> axij;
+    std::vector<float> bi;
+
+    aij.reserve(size_of_gas_data);
+    axij.reserve(size_of_gas_data);
+    bi.reserve(size_of_gas_data);
 /***
     for (unsigned int i = 0; i < 10; i++)
         for (unsigned int j = 0; j < 10; j++)
@@ -154,17 +163,16 @@ void pr_eos::PR_consts_Calc_mix()
     for (unsigned int i = 0; i < 10; i++)
         bi[i] = x[i] * prmix[i].b;
 
-
     for (unsigned int i = 0; i < 10; i++)
         for (unsigned int j = 0; j < 10; j++)
             pr_ans.a = pr_ans.a + axij[i][j];
 
     for (unsigned int i = 0; i < 10; i++)
         pr_ans.b = pr_ans.b + bi[i];
-
-    pr_ans.aa = pr_ans.a * gas1[0].p / (r * r * gas1[0].t * gas1[0].t);  //A constant fpr Z-equation
-    pr_ans.bb = pr_ans.b * gas1[0].p / (r * gas1[0].t);  //B constant fpr Z-equation
 ***/
+    pr_ans.aa = pr_ans.a * p / (r * r * t * t);  // A constant for Z-equation
+    pr_ans.bb = pr_ans.b * p / (r * t);          // B constant for Z-equation
+
     pr_ans.c = (1 - pr_ans.bb);
     pr_ans.d = (pr_ans.aa - 2 * pr_ans.bb - 3 * pr_ans.bb * pr_ans.bb);
     pr_ans.e = (pr_ans.aa * pr_ans.bb - pr_ans.bb * pr_ans.bb - pr_ans.bb * pr_ans.bb * pr_ans.bb);

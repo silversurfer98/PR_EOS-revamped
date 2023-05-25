@@ -14,7 +14,7 @@ struct PR_props
 
 struct base_props
 {
-    float tc, pc, w;
+    float tc, pc, w, xi;
 };
 
 // --------------------------------------------------------
