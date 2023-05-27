@@ -18,9 +18,9 @@ private:
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
     PR_props pr_ans;
-    std::vector<PR_props> pr_data;
     unsigned int size_of_gas_data = 1;
     bool Is_mix = true;
+    std::vector<PR_props> pr_data;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
@@ -35,6 +35,7 @@ public:
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
+    void construct_pr_mix_props();
     void construct_pr_props();
     void PR_consts_Calc_mix();
 };
@@ -110,21 +111,25 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 
 }
 
-void pr_eos::construct_pr_props()
+void pr_eos::construct_pr_mix_props()
 {
     // to implement, 
     // create pr_props vector
     // iterate through each base_gas_data and send to PR_const calc func
     pr_data.reserve(5);
+    PR_props* ans = new PR_props;
+
     if(base_data_pt)
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-            PR_props ans;
-            PR_consts_Calc(&(*i), &ans);
-            pr_data.push_back(ans);
+            PR_consts_Calc(&(*i), ans);
+            pr_data.push_back(*ans);
             
             // print data
-            pr_mix_report(&ans);
+            // pr_mix_report(&ans);
         }
+        delete ans;
+        // for(auto i : pr_data)
+        //     pr_mix_report(&i);
 }
 
 void pr_eos::pr_mix_report(PR_props* pr)
@@ -145,19 +150,37 @@ void pr_eos::PR_consts_Calc_mix()
 {
 
     float t1, t2;
-    for (unsigned int i = 0; i < size_of_gas_data; i++){
+
+    // for(auto i : pr_data)
+    //     std::cout << "\n m = " << i.k<<"\n";
+
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
+    {
         for (unsigned int j = 0; j < size_of_gas_data; j++)
         {
-            t1 = sqrt(pr_data[i].a * pr_data[j].a) * (1 - (*bip_data_ptr)[i][j]);
+            t1 = sqrt((pr_data[i].a) * (pr_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
             t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
-        
+      
             // print matrix - DEBUG
             // std::cout<<t2<<"\t";
 
             pr_ans.a = pr_ans.a + t2;
         }
-        std::cout<<"\n";
+        // std::cout<<"\n";
+    }
+
+/*** range based for loop
+    unsigned int a=0,b=0;
+    for(auto i : pr_data){
+        for(auto j : pr_data){
+            t1 = sqrt(i.a * j.a) * (1 - (*bip_data_ptr)[a][b]);
+            t2 = (*base_data_pt)[a].xi * (*base_data_pt)[b].xi * t1;
+            pr_ans.a = pr_ans.a + t2;
+            b++;
         }
+        a++;
+    }
+***/
 
     for (unsigned int i = 0; i < size_of_gas_data; i++)
         pr_ans.b = pr_ans.b + (*base_data_pt)[i].xi * pr_data[i].b;
@@ -179,4 +202,21 @@ void pr_eos::PR_consts_Calc_mix()
     std::cout<<"\n\nmix gas results ------> \n";
     pr_mix_report(&pr_ans);
     std::cout<<"\n----------------------> \n";
+}
+
+void pr_eos::construct_pr_props()
+{
+    if(Is_mix){
+        construct_pr_mix_props();
+        PR_consts_Calc_mix();
+    }
+    else{
+        std::cout<<"\nsingle gas\n\n";
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i)
+            PR_consts_Calc(&(*i), &pr_ans);
+    std::cout<<"\n\nmix gas results ------> \n";
+    pr_mix_report(&pr_ans);
+    std::cout<<"\n----------------------> \n";
+    }
+
 }
