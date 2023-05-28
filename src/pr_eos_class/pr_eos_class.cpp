@@ -10,6 +10,20 @@
 
 const float r = 8.3144598; // unit ---> J / K ⋅ mol
 
+float func(float value, std::shared_ptr<std::vector<float>> parameters)
+{
+    // f(Z) = Z3 - CZ2 + DZ - E = 0
+    return pow(value, 3) - (*parameters)[0] * pow(value, 2) + (*parameters)[1] * value - (*parameters)[2];
+}
+
+float Derivative_of_func(float value, std::shared_ptr<std::vector<float>> parameters)
+{
+    // f(Z) = Z3 - CZ2 + DZ - E = 0
+    // f'(Z) = 3Z2 - 2CZ + D = 0
+    return 3 * pow(value, 2) - 2 * (*parameters)[0] * value + (*parameters)[1];
+}
+
+
 class pr_eos
 {
 private:
@@ -158,7 +172,10 @@ void pr_eos::PR_consts_Calc_mix()
     {
         for (unsigned int j = 0; j < size_of_gas_data; j++)
         {
-            t1 = sqrt((pr_data[i].a) * (pr_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
+            float a = (pr_data[i].a);
+            float b = (pr_data[j].a);
+            t1 = sqrt(a * b) * (1 - (*bip_data_ptr)[i][j]);
+            // t1 = sqrt((pr_data[i].a) * (pr_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
             t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
       
             // print matrix - DEBUG
@@ -219,4 +236,51 @@ void pr_eos::construct_pr_props()
     std::cout<<"\n----------------------> \n";
     }
 
+    std::vector<float> parameters;
+    parameters.reserve(3);
+
+    // i think this is where the problem is ---------
+    parameters.push_back(pr_ans.c);
+    parameters.push_back(pr_ans.d);
+    parameters.push_back(pr_ans.e);
+
+    std::shared_ptr<std::vector<float>> ptr;
+    ptr = std::make_shared<std::vector<float>>(parameters);
+
+    float (*fun)(float, std::shared_ptr<std::vector<float>>) = func;
+    float (*funcd)(float, std::shared_ptr<std::vector<float>>) = Derivative_of_func;
+
+    // before solving anything lets find whether the equation has one or 3 real toots
+    float Q1 = parameters[0]*parameters[1]/6 - parameters[2]/2 - pow(parameters[0],3)/27;
+    float P1 = pow(parameters[0],2)/9 - parameters[1]/3;
+    float D = Q1*Q1 - P1*P1*P1;
+
+    if (D>=0){
+        std::cout<<"\nonly one real root so going for newton raphson way\n";
+        float f = 1.0;
+        bool ans = newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50);
+        std::cout<<"\nans : "<<f;
+    }
+    else{
+        std::cout<<"\n\nhas three roots under cons\n\n";
+       
+        std::vector<float> initial;
+
+        initial.push_back(0);
+        initial.push_back(0.5);
+        initial.push_back(1);
+
+        std::shared_ptr<std::vector<float>> ini_p;
+        ini_p = std::make_shared<std::vector<float>>(initial);
+
+        weistrass_controlled(ini_p, fun, ptr, 0.01, 50);
+        // if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50)){
+            std::cout<<"\nsuceeded\n";
+            for(const auto& i : *ini_p)
+                std::cout<<i<<"\n";
+        // }
+
+    }
+    
+    
 }

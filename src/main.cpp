@@ -49,7 +49,13 @@ int main()
             // std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
     // }
 
-    pr_eos eos(2, 120, "props.db");
+    // float p, t;
+    // std::cout<<"Enter Pressure in bar : ";
+    // std::cin>>p;
+    // std::cout<<"Enter temperature in celcius : ";
+    // std::cin>>t;
+
+    pr_eos eos(4, 40, "props.db");
     eos.print_base_data();
     // eos.print_bip_data();
     eos.construct_pr_props();
