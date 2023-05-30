@@ -39,6 +39,7 @@ private:
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
+    void pr_mix_props();
 
 public:
 // public variables
@@ -83,6 +84,7 @@ pr_eos::~pr_eos()
     std::cout<<"\n\nPR_EOS destructor has been called\n\n";
 }
 
+// print funcs
 void pr_eos::print_base_data()
 {
     std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc Factor"<<"\n";
@@ -105,6 +107,23 @@ void pr_eos::print_bip_data()
 
 }
 
+void pr_eos::pr_mix_report(PR_props* pr)
+{
+    std::cout << "\n m = " << pr->k;
+    std::cout << "\n ac = " << pr->ac;
+    std::cout << "\n alpha = " << pr->alpha;
+    std::cout << "\n a = " << pr->a;
+    std::cout << "\n b = " << pr->b;
+    std::cout << "\n A = " << pr->aa;
+    std::cout << "\n B = " << pr->bb;
+    std::cout << "\n C = " << pr->c;
+    std::cout << "\n D = " << pr->d;
+    std::cout << "\n E = " << pr->e << "\n";
+}
+
+//-------------------------- end of print funcs -----------------------------------
+
+//core PR EOS func contains all math
 void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 {
     // pressure unit is Mpa
@@ -125,6 +144,8 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 
 }
 
+
+//all other shenanigans here
 void pr_eos::construct_pr_mix_props()
 {
     // to implement, 
@@ -144,20 +165,6 @@ void pr_eos::construct_pr_mix_props()
         delete ans;
         // for(auto i : pr_data)
         //     pr_mix_report(&i);
-}
-
-void pr_eos::pr_mix_report(PR_props* pr)
-{
-    std::cout << "\n m = " << pr->k;
-    std::cout << "\n ac = " << pr->ac;
-    std::cout << "\n alpha = " << pr->alpha;
-    std::cout << "\n a = " << pr->a;
-    std::cout << "\n b = " << pr->b;
-    std::cout << "\n A = " << pr->aa;
-    std::cout << "\n B = " << pr->bb;
-    std::cout << "\n C = " << pr->c;
-    std::cout << "\n D = " << pr->d;
-    std::cout << "\n E = " << pr->e << "\n";
 }
 
 void pr_eos::PR_consts_Calc_mix()
@@ -220,6 +227,61 @@ void pr_eos::PR_consts_Calc_mix()
     pr_mix_report(&pr_ans);
     std::cout<<"\n----------------------> \n";
 }
+
+// new WTF
+void pr_eos::pr_mix_props()
+{
+// to implement, 
+    // create pr_props vector
+    // iterate through each base_gas_data and send to PR_const calc func
+    std::vector<PR_props> pr_mix_data;
+    pr_mix_data.reserve(size_of_gas_data);
+    PR_props* ans = new PR_props;
+
+    if(base_data_pt)
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            PR_consts_Calc(&(*i), ans);
+            pr_mix_data.push_back(*ans);
+        }
+    delete ans;
+
+    // for printing
+        // for(auto i : pr_mix_data)
+        //     pr_mix_report(&i);
+
+    float t1, t2, a, b, aa=0, bb=0;
+
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
+    {
+        a = (pr_mix_data[i].a);
+        for (unsigned int j = 0; j < size_of_gas_data; j++)
+        {
+            b = (pr_mix_data[j].a);
+            t1 = sqrt(a * b) * (1 - (*bip_data_ptr)[i][j]);
+            // t1 = sqrt((pr_mix_data[i].a) * (pr_mix_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
+            t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
+        
+            // print matrix - DEBUG
+            // std::cout<<t2<<"\t";
+        
+            aa = aa + t2;
+        }
+        // std::cout<<"\n";
+    }
+
+    for (unsigned int i = 0; i < size_of_gas_data; i++)
+        bb = bb + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
+
+    float c,d,e;
+    // these are the results to solve for Z
+    aa = aa * p / (r * r * t * t);  // A constant for Z-equation
+    bb = bb * p / (r * t);          // B constant for Z-equation
+
+    c = (1 - bb);
+    d = (aa - 2 * bb - 3 * pow(bb, 2));
+    e = (aa * bb - pow(bb, 2) - pow(bb, 3)); 
+}
+// ----------
 
 void pr_eos::construct_pr_props()
 {
