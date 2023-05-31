@@ -63,8 +63,8 @@ bool weistrass_controlled(std::shared_ptr<std::vector<float>> initial_val,
                           uint16_t controlled_iter)
 {
     float temp = 1;
-    unsigned int success = 0;
-    unsigned int degree = (*initial_val).size();
+    uint16_t success = 0;
+    uint16_t degree = (*initial_val).size();
     float* z_new = new float[degree];
     float* error = new float[degree];
 
@@ -76,10 +76,10 @@ bool weistrass_controlled(std::shared_ptr<std::vector<float>> initial_val,
     for(i=0;i<controlled_iter;i++)
     {
         success = 0;
-        for(unsigned int j=0;j<degree;j++)
+        for(uint16_t j=0;j<degree;j++)
         {
             temp = 1;
-            for(unsigned int z=0;z<degree;z++)
+            for(uint16_t z=0;z<degree;z++)
                 if(z!=j)
                     temp = temp * ((*initial_val)[j]-(*initial_val)[z]);
                     

@@ -6,12 +6,6 @@ struct CP_Const
     float A, B, C, D;
 };
 
-//PR EOS properties definition
-struct PR_props
-{
-    float a, b, aa, bb, k, alpha, ac, c, d, e;
-};
-
 struct base_props
 {
     float tc, pc, w, xi;

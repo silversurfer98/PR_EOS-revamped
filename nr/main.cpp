@@ -20,8 +20,15 @@ float func3(float x, std::shared_ptr<std::vector<float>> parameters)
     return temp;
 }
 
+float funcZ(float value, std::shared_ptr<std::vector<float>> parameters)
+{
+    // f(Z) = Z3 - CZ2 + DZ - E = 0
+    return value*value*value - (*parameters)[0] * value*value + (*parameters)[1] * value - (*parameters)[2];
+}
+
 int main()
 {
+/***
     std::vector<float> parameters;
     parameters.push_back(5);
 
@@ -41,16 +48,16 @@ int main()
     f = 1.0;
     if(newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50))
         std::cout<<"\nans from controlled : "<<f;
-
+***/
 // ---------------------------------------------------------------------
     std::vector<float> parameters_w;
     std::vector<float> initial;
-    parameters_w.push_back(6);
-    parameters_w.push_back(11);
-    parameters_w.push_back(6);
+    parameters_w.push_back(0.997698);
+    parameters_w.push_back(0.0156476);
+    parameters_w.push_back(4.134e-05);
 
-    initial.push_back(1);
-    initial.push_back(1);
+    initial.push_back(0);
+    initial.push_back(0.5);
     initial.push_back(1);
 
     std::shared_ptr<std::vector<float>> ptr_w;
@@ -59,16 +66,16 @@ int main()
     ptr_w = std::make_shared<std::vector<float>>(parameters_w);
     ini_p = std::make_shared<std::vector<float>>(initial);
 
-    float (*fun3)(float, std::shared_ptr<std::vector<float>>) = func3;
+    float (*fun)(float, std::shared_ptr<std::vector<float>>) = funcZ;
 
-    std::cout<<"\nweistrass func = "<<fun3(0, ptr_w);
+    std::cout<<"\nweistrass func = "<<fun(1, ptr_w)<<"\n\n";
 
-    if(weistrass_controlled(ini_p, fun3, ptr_w, 0.01, 50))
+    if(weistrass_controlled(ini_p, fun, ptr_w, 0.0001, 50))
         std::cout<<"\nsuceeded\n";
     
-    for(const auto& i : *ini_p)
+    for(const auto& i : initial)
         std::cout<<i<<"\n";
 
-    std::cout<<"\n\nmain";
+    std::cout<<"\n\nend of nr main";
     return 0;
 }

@@ -12,19 +12,11 @@ struct CP_Const
     float A, B, C, D;
 };
 
-//PR EOS properties definition
-struct PR_props
-{
-    float a, b, aa, bb, k, alpha, ac, c, d, e;
-};
-
 //gas base properties definition
 struct base_props
 {
     float tc, pc, w, xi = 0;
 };
-
-
 
 class db_class
 {
@@ -87,16 +79,6 @@ db_class:: db_class(const char* custom_filename)
         my_ref = custom_filename;
     }
 
-    // open the database in the constructor
-
-    // int rc = sqlite3_open(database_filename.c_str(), &db);
-    // if (rc != SQLITE_OK) {
-    //     std::cerr << "SQL error: " << sqlite3_errmsg(db) << '\n';
-    //     sqlite3_close(db);
-    //     Is_database_open = false;
-    // }
-    // else 
-    //    Is_database_open = true;
 }
 
 db_class:: ~db_class()

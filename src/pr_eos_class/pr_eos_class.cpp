@@ -8,6 +8,12 @@
 #include "maths.h"
 #include "db_class.h"
 
+//PR EOS properties definition
+struct PR_props
+{
+    float a, b, k, alpha, ac;
+};
+
 const float r = 8.3144598; // unit ---> J / K ⋅ mol
 
 float func(float value, std::shared_ptr<std::vector<float>> parameters)
@@ -31,18 +37,20 @@ private:
     float p=1, t=273.15;
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
-    PR_props pr_ans;
     unsigned int size_of_gas_data = 1;
     bool Is_mix = true;
-    std::vector<PR_props> pr_data;
+    // std::vector<PR_props> pr_data;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
     void pr_mix_props();
+    void pr_single_gas_props();
 
 public:
 // public variables
+    std::vector<float> parameters;
+    float z, zl;
     db_class mydbclass;
 
 // public member funcs
@@ -50,9 +58,7 @@ public:
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-    void construct_pr_mix_props();
-    void construct_pr_props();
-    void PR_consts_Calc_mix();
+    void getZ();
 };
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
@@ -60,10 +66,15 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
     p = pressure*0.1 - 0.101325;
     // p = 0.000001 * (pressure*100000 - 101325);
     t = temperature + 273.15;
-    // db_class* mydbclass;
-    // db_class mydbclass{db_name};
-    // mydbclass = new db_class(db_name);
-        unsigned int res = mydbclass.get_all_gas_names();
+    // mydbclass = new db_class(db_n);
+    
+    z = 1; zl = 0;
+    parameters.reserve(3);
+    for(uint16_t i = 0;i<3;i++)
+        parameters.push_back(1.0);
+    
+ 
+    unsigned int res = mydbclass.get_all_gas_names();
     if(res==0)
         res = mydbclass.choose_gas_from_user();
     
@@ -77,6 +88,8 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
 
     if(Is_mix)
         bip_data_ptr = mydbclass.get_bip_pointer();
+
+    std::cout<<"PR class constructor called and finished \n\n";
 }
 
 pr_eos::~pr_eos()
@@ -87,10 +100,13 @@ pr_eos::~pr_eos()
 // print funcs
 void pr_eos::print_base_data()
 {
-    std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc Factor"<<"\n";
-    if(base_data_pt)
+    if(base_data_pt){
+        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Xi"<<"\n";
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\n";
+    }
+    else
+        std::cout<<"\nenakune varuveengala da\n";
 }
 
 void pr_eos::print_bip_data()
@@ -114,11 +130,6 @@ void pr_eos::pr_mix_report(PR_props* pr)
     std::cout << "\n alpha = " << pr->alpha;
     std::cout << "\n a = " << pr->a;
     std::cout << "\n b = " << pr->b;
-    std::cout << "\n A = " << pr->aa;
-    std::cout << "\n B = " << pr->bb;
-    std::cout << "\n C = " << pr->c;
-    std::cout << "\n D = " << pr->d;
-    std::cout << "\n E = " << pr->e << "\n";
 }
 
 //-------------------------- end of print funcs -----------------------------------
@@ -134,101 +145,46 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
     prprops->a = prprops->ac * prprops->alpha;  //refined a-constant PREOS   cm6-pascal/mol2
     prprops->b = (0.077796074 * r * gas_prop->tc) / (gas_prop->pc * 0.000001); //b-constant PREOS   cm3/mol
 
-    prprops->aa = prprops->a * p / (r * r * t* t);  //A constant fpr Z-equation
-    prprops->bb = prprops->b * p / (r * t);  //B constant fpr Z-equation
+    // prprops->aa = prprops->a * p / (r * r * t* t);  //A constant fpr Z-equation
+    // prprops->bb = prprops->b * p / (r * t);  //B constant fpr Z-equation
 
-    //constants for the equation 
-    prprops->c = (1 - prprops->bb);
-    prprops->d = (prprops->aa - 2 * prprops->bb - 3 * prprops->bb * prprops->bb);
-    prprops->e = (prprops->aa * prprops->bb - prprops->bb * prprops->bb - prprops->bb * prprops->bb * prprops->bb);
+    // constants for the equation 
+    // prprops->c = (1 - prprops->bb);
+    // prprops->d = (prprops->aa - 2 * prprops->bb - 3 * prprops->bb * prprops->bb);
+    // prprops->e = (prprops->aa * prprops->bb - prprops->bb * prprops->bb - prprops->bb * prprops->bb * prprops->bb);
 
 }
 
 
 //all other shenanigans here
-void pr_eos::construct_pr_mix_props()
-{
-    // to implement, 
-    // create pr_props vector
-    // iterate through each base_gas_data and send to PR_const calc func
-    pr_data.reserve(5);
-    PR_props* ans = new PR_props;
 
-    if(base_data_pt)
-        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-            PR_consts_Calc(&(*i), ans);
-            pr_data.push_back(*ans);
-            
-            // print data
-            // pr_mix_report(&ans);
-        }
-        delete ans;
-        // for(auto i : pr_data)
-        //     pr_mix_report(&i);
-}
-
-void pr_eos::PR_consts_Calc_mix()
-{
-
-    float t1, t2;
-
-    // for(auto i : pr_data)
-    //     std::cout << "\n m = " << i.k<<"\n";
-
-    for (unsigned int i = 0; i < size_of_gas_data; i++)
-    {
-        for (unsigned int j = 0; j < size_of_gas_data; j++)
-        {
-            float a = (pr_data[i].a);
-            float b = (pr_data[j].a);
-            t1 = sqrt(a * b) * (1 - (*bip_data_ptr)[i][j]);
-            // t1 = sqrt((pr_data[i].a) * (pr_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
-            t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
-      
-            // print matrix - DEBUG
-            // std::cout<<t2<<"\t";
-
-            pr_ans.a = pr_ans.a + t2;
-        }
-        // std::cout<<"\n";
-    }
-
-/*** range based for loop
-    unsigned int a=0,b=0;
-    for(auto i : pr_data){
-        for(auto j : pr_data){
-            t1 = sqrt(i.a * j.a) * (1 - (*bip_data_ptr)[a][b]);
-            t2 = (*base_data_pt)[a].xi * (*base_data_pt)[b].xi * t1;
-            pr_ans.a = pr_ans.a + t2;
-            b++;
-        }
-        a++;
-    }
-***/
-
-    for (unsigned int i = 0; i < size_of_gas_data; i++)
-        pr_ans.b = pr_ans.b + (*base_data_pt)[i].xi * pr_data[i].b;
-
-
-    // set these values to 0
-    pr_ans.k = 0;
-    pr_ans.ac = 0;
-    pr_ans.alpha = 0;
-
-    // these are the results to solve for Z
-    pr_ans.aa = pr_ans.a * p / (r * r * t * t);  // A constant for Z-equation
-    pr_ans.bb = pr_ans.b * p / (r * t);          // B constant for Z-equation
-
-    pr_ans.c = (1 - pr_ans.bb);
-    pr_ans.d = (pr_ans.aa - 2 * pr_ans.bb - 3 * pr_ans.bb * pr_ans.bb);
-    pr_ans.e = (pr_ans.aa * pr_ans.bb - pr_ans.bb * pr_ans.bb - pr_ans.bb * pr_ans.bb * pr_ans.bb);
-
-    std::cout<<"\n\nmix gas results ------> \n";
-    pr_mix_report(&pr_ans);
-    std::cout<<"\n----------------------> \n";
-}
 
 // new WTF
+void pr_eos::pr_single_gas_props()
+{
+    PR_props* ans = new PR_props;
+    std::cout<<"\nsingle gas\n\n";
+    for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i)
+        PR_consts_Calc(&(*i), ans);
+    
+    float aa, bb;
+    // these are the results to solve for Z
+    aa = ans->a * p / (r * r * t * t);  // A constant for Z-equation
+    bb = ans->b * p / (r * t);          // B constant for Z-equation
+    
+    delete ans;
+
+    // float c,d,e;
+    // c = (1 - bb);
+    // d = (aa - 2 * bb - 3 * pow(bb, 2));
+    // e = (aa * bb - pow(bb, 2) - pow(bb, 3));
+    // printf("\n\nC : %f\nD : %f\nE : %f\n\n",c,d,e);
+
+    parameters[0] = ((1 - bb));
+    parameters[1] = ((aa - 2 * bb - 3 * pow(bb, 2)));
+    parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
+}
+
 void pr_eos::pr_mix_props()
 {
 // to implement, 
@@ -272,45 +228,38 @@ void pr_eos::pr_mix_props()
     for (unsigned int i = 0; i < size_of_gas_data; i++)
         bb = bb + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
 
-    float c,d,e;
     // these are the results to solve for Z
     aa = aa * p / (r * r * t * t);  // A constant for Z-equation
     bb = bb * p / (r * t);          // B constant for Z-equation
 
-    c = (1 - bb);
-    d = (aa - 2 * bb - 3 * pow(bb, 2));
-    e = (aa * bb - pow(bb, 2) - pow(bb, 3)); 
+    // float c,d,e;
+    // c = (1 - bb);
+    // d = (aa - 2 * bb - 3 * pow(bb, 2));
+    // e = (aa * bb - pow(bb, 2) - pow(bb, 3));
+    // printf("\n\nC : %f\nD : %f\nE : %f\n\n",c,d,e);
+
+    parameters[0] = ((1 - bb));
+    parameters[1] = ((aa - 2 * bb - 3 * pow(bb, 2)));
+    parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
 }
-// ----------
+// --------------------------------
 
-void pr_eos::construct_pr_props()
+void pr_eos::getZ()
 {
-    if(Is_mix){
-        construct_pr_mix_props();
-        PR_consts_Calc_mix();
-    }
-    else{
-        std::cout<<"\nsingle gas\n\n";
-        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i)
-            PR_consts_Calc(&(*i), &pr_ans);
-    std::cout<<"\n\nmix gas results ------> \n";
-    pr_mix_report(&pr_ans);
-    std::cout<<"\n----------------------> \n";
-    }
+    if(Is_mix)
+        pr_mix_props();
+    else
+        pr_single_gas_props();
 
-    std::vector<float> parameters;
-    parameters.reserve(3);
+    // create ptr to parameters
+    std::shared_ptr<std::vector<float>> ptr = std::make_shared<std::vector<float>>(parameters);
 
-    // i think this is where the problem is ---------
-    parameters.push_back(pr_ans.c);
-    parameters.push_back(pr_ans.d);
-    parameters.push_back(pr_ans.e);
-
-    std::shared_ptr<std::vector<float>> ptr;
-    ptr = std::make_shared<std::vector<float>>(parameters);
-
+    // create function pointers
     float (*fun)(float, std::shared_ptr<std::vector<float>>) = func;
     float (*funcd)(float, std::shared_ptr<std::vector<float>>) = Derivative_of_func;
+
+    for(const auto& i : parameters)
+        std::cout<<"\n"<<i;
 
     // before solving anything lets find whether the equation has one or 3 real toots
     float Q1 = parameters[0]*parameters[1]/6 - parameters[2]/2 - pow(parameters[0],3)/27;
@@ -319,30 +268,27 @@ void pr_eos::construct_pr_props()
 
     if (D>=0){
         std::cout<<"\nonly one real root so going for newton raphson way\n";
-        float f = 1.0;
-        bool ans = newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50);
-        std::cout<<"\nans : "<<f;
+        // float* f = &z;
+        bool ans = newton_raphson_controlled(&z,fun,funcd,ptr,0.0001,50);
+        std::cout<<"\nans : "<<z;
     }
     else{
         std::cout<<"\n\nhas three roots under cons\n\n";
-       
-        std::vector<float> initial;
 
-        initial.push_back(0);
-        initial.push_back(0.5);
-        initial.push_back(1);
+        std::vector<float> ini;
+        ini.reserve(3);
 
-        std::shared_ptr<std::vector<float>> ini_p;
-        ini_p = std::make_shared<std::vector<float>>(initial);
+        ini.push_back(0);
+        ini.push_back(0.5);
+        ini.push_back(1);
 
-        weistrass_controlled(ini_p, fun, ptr, 0.01, 50);
-        // if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50)){
-            std::cout<<"\nsuceeded\n";
-            for(const auto& i : *ini_p)
-                std::cout<<i<<"\n";
-        // }
+        std::shared_ptr<std::vector<float>> ini_p = std::make_shared<std::vector<float>>(ini);
 
+        // for weistrass initial guess is VERY VERY IMPORTANT -------
+        if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50))
+            std::cout<<"\nweistrass suceeded\n";
+        
+        for(const auto& i : *ini_p)
+            std::cout<<i<<"\n";
     }
-    
-    
 }

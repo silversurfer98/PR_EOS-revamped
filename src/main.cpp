@@ -1,7 +1,7 @@
 #include "db_class.h"
 #include "pr_eos_class.h"
 #include <iostream>
-int mmain()
+void testDB()
 {
     db_class mydbclass("props.db");
     // unsigned int res = mydbclass.get_all_gas_names();
@@ -16,39 +16,29 @@ int mmain()
 
 // print the bip data
 
-    std::cout<<"\n I'm from main\n\n";
+    std::cout<<"\n binary interaction parameters \n";
     if(bip_ptr!=nullptr){
     for(auto row = bip_ptr->begin(); row != bip_ptr->end(); ++row){
         for(auto col = row->begin(); col != row->end(); ++col)
                 std::cout<<*col<<"\t";
             std::cout<<"\n";}}
-    // // if(res == 0)
+    std::cout<<"\n\n";
+
+    std::cout<<"\n Cp parameters \n";
     if(cp!=nullptr)
         for(auto i = cp->begin(); i != cp->end(); ++i) 
             std::cout<<"\n"<<i->A<<"\t"<<i->B<<"\t"<<i->C<<"\t"<<i->D<<"\n";
+    std::cout<<"\n\n";
 
+    std::cout<<"\n base gas parameters \n";
     if(bp!=nullptr)
         for(auto i = bp->begin(); i != bp->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
-
-    std::cout<<"\n main done\n\n";
-
-    return 0;
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\n";
+    std::cout<<"\n\n";
 }
 
-int main()
+void testPRclass()
 {
-    // {
-    // db_class mydbclass("props.db");
-    // mydbclass.get_all_gas_names();
-    // mydbclass.choose_gas_from_user();
-    // std::unique_ptr<std::vector<base_props>> bp;
-    // bp = mydbclass.get_base_gas_props_ptr();
-    // if(bp)
-        // for(auto i = bp->begin(); i != bp->end(); ++i) 
-            // std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\n";
-    // }
-
     // float p, t;
     // std::cout<<"Enter Pressure in bar : ";
     // std::cin>>p;
@@ -58,9 +48,16 @@ int main()
     pr_eos eos(4, 40, "props.db");
     eos.print_base_data();
     // eos.print_bip_data();
-    eos.construct_pr_props();
-    // eos.PR_consts_Calc_mix();
-    std::cout<<"\nEnd of main\n";
+    eos.getZ();
+
+}
+
+int main()
+{
+    std::cout<<"\n I'm from main\n\n";
+    // testDB();
+    testPRclass();
+    std::cout<<"\n\nEnd of main\n\n";
     return 0;
 }
 // one thing can be done open db again and again for each operations
