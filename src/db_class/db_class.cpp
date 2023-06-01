@@ -382,7 +382,7 @@ unsigned int db_class::get_base_gas_props()
             if(sqlite3_step(stmt) == 100){
                 base_props temp { (float)sqlite3_column_double(stmt, 0),
                                   (float)sqlite3_column_double(stmt, 1),
-                                  (float)sqlite3_column_double(stmt, 2), 0, 1};
+                                  (float)sqlite3_column_double(stmt, 2), 1, 1};
                 base_gas_props.push_back(temp);
             }
                 
@@ -433,11 +433,16 @@ std::unique_ptr<std::vector<base_props>> db_class::get_base_gas_props_ptr()
 {
      unsigned int res = get_base_gas_props();
     // std::cout<<"\n\nres : "<<res<<"\n\n";
-    if(res==0){
-        bool t = get_comp();
-        while(!t)
+    if(res==0)
+    {
+        if(is_mix){
+            bool t = get_comp();
+            while(!t)
             t = get_comp();
-        return std::move(base_gas_props_ptr);        
+            return std::move(base_gas_props_ptr);
+        }
+        else 
+            return std::move(base_gas_props_ptr);
     }
     else
         return 0;

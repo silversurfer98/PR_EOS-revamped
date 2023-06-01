@@ -50,7 +50,9 @@ void testPRclass()
     // eos.print_bip_data();
     eos.getZ(true);
     eos.print_base_data();
-
+    eos.p=5;
+    eos.getZ(true);
+    eos.print_base_data();
 
 }
 

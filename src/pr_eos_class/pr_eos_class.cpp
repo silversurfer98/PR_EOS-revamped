@@ -52,7 +52,6 @@ private:
     // std::vector<PR_props> pr_data;
 
 // private member funcs
-    std::unique_ptr<std::vector<base_props>> base_data_pt;
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
     void pr_mix_props();
@@ -62,6 +61,7 @@ private:
 
 public:
 // public variables
+    std::unique_ptr<std::vector<base_props>> base_data_pt;
     float z, zl;
     float p, t;
     db_class mydbclass;
@@ -343,6 +343,6 @@ void pr_eos::getZ(bool Calc_phi)
         std::cout<<"\nans : "<<z<<"\t"<<zl;
         
     }
-    if(cal_phi)
+    if(cal_phi && Is_mix)
         calc_phi(z);
 }
