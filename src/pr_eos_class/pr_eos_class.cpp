@@ -29,28 +29,41 @@ float Derivative_of_func(float value, std::shared_ptr<std::vector<float>> parame
     return 3 * pow(value, 2) - 2 * (*parameters)[0] * value + (*parameters)[1];
 }
 
+void swap(float* a, float* b)
+{
+    float t;
+    t = *a;
+    *a = *b;
+    *b = t;
+}
+
 
 class pr_eos
 {
 private:
 // private variable
-    float p=1, t=273.15;
-    std::unique_ptr<std::vector<base_props>> base_data_pt;
+    std::vector<PR_props> pr_mix_data;
+    std::vector<float> parameters;
     std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
     unsigned int size_of_gas_data = 1;
     bool Is_mix = true;
+    float aa, bb, a, b;
+    bool cal_phi = false;
     // std::vector<PR_props> pr_data;
 
 // private member funcs
+    std::unique_ptr<std::vector<base_props>> base_data_pt;
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
     void pr_mix_props();
     void pr_single_gas_props();
+    void calc_phi(float z);
+    std::vector<float> aik;
 
 public:
 // public variables
-    std::vector<float> parameters;
     float z, zl;
+    float p, t;
     db_class mydbclass;
 
 // public member funcs
@@ -58,7 +71,7 @@ public:
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-    void getZ();
+    void getZ(bool Calc_phi);
 };
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
@@ -101,9 +114,9 @@ pr_eos::~pr_eos()
 void pr_eos::print_base_data()
 {
     if(base_data_pt){
-        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Xi"<<"\n";
+        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Xi"<<"\t"<<"phi"<<"\n";
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\n";
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\t"<<i->phi<<"\n";
     }
     else
         std::cout<<"\nenakune varuveengala da\n";
@@ -167,10 +180,10 @@ void pr_eos::pr_single_gas_props()
     for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i)
         PR_consts_Calc(&(*i), ans);
     
-    float aa, bb;
+    aa = 0; bb = 0; a = ans->a; b = ans->b;
     // these are the results to solve for Z
-    aa = ans->a * p / (r * r * t * t);  // A constant for Z-equation
-    bb = ans->b * p / (r * t);          // B constant for Z-equation
+    aa = a * p / (r * r * t * t);  // A constant for Z-equation
+    bb = b * p / (r * t);          // B constant for Z-equation
     
     delete ans;
 
@@ -190,7 +203,6 @@ void pr_eos::pr_mix_props()
 // to implement, 
     // create pr_props vector
     // iterate through each base_gas_data and send to PR_const calc func
-    std::vector<PR_props> pr_mix_data;
     pr_mix_data.reserve(size_of_gas_data);
     PR_props* ans = new PR_props;
 
@@ -205,32 +217,38 @@ void pr_eos::pr_mix_props()
         // for(auto i : pr_mix_data)
         //     pr_mix_report(&i);
 
-    float t1, t2, a, b, aa=0, bb=0;
+    if(Is_mix && cal_phi)
+        aik.reserve(size_of_gas_data);
 
+    float aij, axij, x, y;
+    aa = 0; bb = 0; a = 0; b = 0;
     for (unsigned int i = 0; i < size_of_gas_data; i++)
     {
-        a = (pr_mix_data[i].a);
+        x = (pr_mix_data[i].a);
         for (unsigned int j = 0; j < size_of_gas_data; j++)
         {
-            b = (pr_mix_data[j].a);
-            t1 = sqrt(a * b) * (1 - (*bip_data_ptr)[i][j]);
+            y = (pr_mix_data[j].a);
+            aij = sqrt(x * y) * (1 - (*bip_data_ptr)[i][j]);
             // t1 = sqrt((pr_mix_data[i].a) * (pr_mix_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
-            t2 = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * t1;
+            axij = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * aij;
         
             // print matrix - DEBUG
             // std::cout<<t2<<"\t";
         
-            aa = aa + t2;
+            a = a + axij;
+
+            if(cal_phi)
+                aik[j] = aik[j] + (*base_data_pt)[i].xi * aij;
         }
         // std::cout<<"\n";
     }
 
     for (unsigned int i = 0; i < size_of_gas_data; i++)
-        bb = bb + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
+        b = b + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
 
     // these are the results to solve for Z
-    aa = aa * p / (r * r * t * t);  // A constant for Z-equation
-    bb = bb * p / (r * t);          // B constant for Z-equation
+    aa = a * p / (r * r * t * t);  // A constant for Z-equation
+    bb = b * p / (r * t);          // B constant for Z-equation
 
     // float c,d,e;
     // c = (1 - bb);
@@ -243,9 +261,30 @@ void pr_eos::pr_mix_props()
     parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
 }
 // --------------------------------
-
-void pr_eos::getZ()
+void pr_eos::calc_phi(float z)
 {
+    // totally under construction
+    printf("\n vera maari vera maari \n");
+    float temp1 = 0;
+    for(uint16_t i=0;i<size_of_gas_data;i++)
+    {
+        temp1 = pr_mix_data[i].b / b;
+
+        if(z!=0 && (*base_data_pt)[i].xi!=0)
+        {
+            (*base_data_pt)[i].phi = exp(((temp1) * (z - 1)) - 
+                                    (log(z - bb)) -
+                                    (0.35355339059327373 * aa / bb) * 
+                                    ((2 * aik[i] / a) - temp1) *
+                                    log((z + 2.414213562373095*bb) / (z - 0.41421356237309515*bb)));
+        }
+
+    }
+}
+
+void pr_eos::getZ(bool Calc_phi)
+{
+    cal_phi = Calc_phi;
     if(Is_mix)
         pr_mix_props();
     else
@@ -268,8 +307,9 @@ void pr_eos::getZ()
 
     if (D>=0){
         std::cout<<"\nonly one real root so going for newton raphson way\n";
-        // float* f = &z;
-        bool ans = newton_raphson_controlled(&z,fun,funcd,ptr,0.0001,50);
+        float f = 1;
+        if(newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50))
+            z = f;
         std::cout<<"\nans : "<<z;
     }
     else{
@@ -285,10 +325,24 @@ void pr_eos::getZ()
         std::shared_ptr<std::vector<float>> ini_p = std::make_shared<std::vector<float>>(ini);
 
         // for weistrass initial guess is VERY VERY IMPORTANT -------
-        if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50))
+        if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50)){
             std::cout<<"\nweistrass suceeded\n";
+            // alternative to qsort cause only 3 no.s
+            if ((*ini_p)[0] > (*ini_p)[2])
+                swap(&(*ini_p)[0], &(*ini_p)[2]);
+
+            if ((*ini_p)[0] > (*ini_p)[1])
+                swap(&(*ini_p)[0], &(*ini_p)[1]);
+
+            if ((*ini_p)[1] > (*ini_p)[2])
+                swap(&(*ini_p)[1], &(*ini_p)[2]);
+            // -----------------------------------------
+            z = (*ini_p)[2];
+            zl = (*ini_p)[0];
+        }
+        std::cout<<"\nans : "<<z<<"\t"<<zl;
         
-        for(const auto& i : *ini_p)
-            std::cout<<i<<"\n";
     }
+    if(cal_phi)
+        calc_phi(z);
 }

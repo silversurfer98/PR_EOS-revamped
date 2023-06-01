@@ -48,7 +48,9 @@ void testPRclass()
     pr_eos eos(4, 40, "props.db");
     eos.print_base_data();
     // eos.print_bip_data();
-    eos.getZ();
+    eos.getZ(true);
+    eos.print_base_data();
+
 
 }
 
