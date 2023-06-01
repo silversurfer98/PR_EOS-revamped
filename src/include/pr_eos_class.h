@@ -23,5 +23,6 @@ public:
     void print_base_data();
     void print_bip_data();
     void getZ(bool Calc_phi);
+    void calc_dew();
     
 };

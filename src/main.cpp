@@ -33,7 +33,7 @@ void testDB()
     std::cout<<"\n base gas parameters \n";
     if(bp!=nullptr)
         for(auto i = bp->begin(); i != bp->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\n";
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->yi<<"\n";
     std::cout<<"\n\n";
 }
 
@@ -46,13 +46,10 @@ void testPRclass()
     // std::cin>>t;
 
     pr_eos eos(4, 40, "props.db");
-    eos.print_base_data();
     // eos.print_bip_data();
     eos.getZ(true);
     eos.print_base_data();
-    eos.p=5;
-    eos.getZ(true);
-    eos.print_base_data();
+    eos.calc_dew();
 
 }
 

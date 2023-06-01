@@ -49,15 +49,18 @@ private:
     bool Is_mix = true;
     float aa, bb, a, b;
     bool cal_phi = false;
-    // std::vector<PR_props> pr_data;
+    std::vector<float> aik;
+    uint16_t no_of_root = 0;
+    // for dew pt calc
+    std::unique_ptr<std::vector<float>> phi_V_ptr;
+    float estimated_temp = 0;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
     void pr_mix_props();
     void pr_single_gas_props();
-    void calc_phi(float z);
-    std::vector<float> aik;
+    void calc_phi(float z, std::unique_ptr<std::vector<float>>& phi);
 
 public:
 // public variables
@@ -72,6 +75,7 @@ public:
     void print_base_data();
     void print_bip_data();
     void getZ(bool Calc_phi);
+    void calc_dew();
 };
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
@@ -113,10 +117,11 @@ pr_eos::~pr_eos()
 // print funcs
 void pr_eos::print_base_data()
 {
+    std::cout<<"\n\n";
     if(base_data_pt){
-        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Xi"<<"\t"<<"phi"<<"\n";
+        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Yi"<<"\t"<<"Tsat"<<"\n";
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->xi<<"\t"<<i->phi<<"\n";
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->yi<<"\t"<<i->tsat<<"\n";
     }
     else
         std::cout<<"\nenakune varuveengala da\n";
@@ -165,12 +170,12 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
     // prprops->c = (1 - prprops->bb);
     // prprops->d = (prprops->aa - 2 * prprops->bb - 3 * prprops->bb * prprops->bb);
     // prprops->e = (prprops->aa * prprops->bb - prprops->bb * prprops->bb - prprops->bb * prprops->bb * prprops->bb);
+    gas_prop->tsat = gas_prop->tc / (1 - 3 * log(p / gas_prop->pc) / (16.11809565095832 * (1 + gas_prop->w)));
 
 }
 
 
 //all other shenanigans here
-
 
 // new WTF
 void pr_eos::pr_single_gas_props()
@@ -217,9 +222,10 @@ void pr_eos::pr_mix_props()
         // for(auto i : pr_mix_data)
         //     pr_mix_report(&i);
 
-    if(Is_mix && cal_phi)
-        aik.reserve(size_of_gas_data);
-
+    if(cal_phi){
+        aik.resize(size_of_gas_data);
+        std::fill(aik.begin(), aik.end(),0.0);
+    }
     float aij, axij, x, y;
     aa = 0; bb = 0; a = 0; b = 0;
     for (unsigned int i = 0; i < size_of_gas_data; i++)
@@ -230,7 +236,7 @@ void pr_eos::pr_mix_props()
             y = (pr_mix_data[j].a);
             aij = sqrt(x * y) * (1 - (*bip_data_ptr)[i][j]);
             // t1 = sqrt((pr_mix_data[i].a) * (pr_mix_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
-            axij = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * aij;
+            axij = (*base_data_pt)[i].yi * (*base_data_pt)[j].yi * aij;
         
             // print matrix - DEBUG
             // std::cout<<t2<<"\t";
@@ -238,13 +244,13 @@ void pr_eos::pr_mix_props()
             a = a + axij;
 
             if(cal_phi)
-                aik[j] = aik[j] + (*base_data_pt)[i].xi * aij;
+                aik[j] = aik[j] + (*base_data_pt)[i].yi * aij;
         }
         // std::cout<<"\n";
     }
 
     for (unsigned int i = 0; i < size_of_gas_data; i++)
-        b = b + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
+        b = b + ((*base_data_pt)[i].yi * pr_mix_data[i].b);
 
     // these are the results to solve for Z
     aa = a * p / (r * r * t * t);  // A constant for Z-equation
@@ -261,22 +267,22 @@ void pr_eos::pr_mix_props()
     parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
 }
 // --------------------------------
-void pr_eos::calc_phi(float z)
+void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
 {
     // totally under construction
-    printf("\n vera maari vera maari \n");
+    // printf("\n vera maari vera maari \n");
     float temp1 = 0;
     for(uint16_t i=0;i<size_of_gas_data;i++)
     {
         temp1 = pr_mix_data[i].b / b;
 
-        if(z!=0 && (*base_data_pt)[i].xi!=0)
+        if(Z!=0 && (*base_data_pt)[i].yi!=0)
         {
-            (*base_data_pt)[i].phi = exp(((temp1) * (z - 1)) - 
-                                    (log(z - bb)) -
-                                    (0.35355339059327373 * aa / bb) * 
-                                    ((2 * aik[i] / a) - temp1) *
-                                    log((z + 2.414213562373095*bb) / (z - 0.41421356237309515*bb)));
+            phi->at(i) = exp(((temp1) * (Z - 1)) - 
+                            (log(Z - bb)) -
+                            (0.35355339059327373 * aa / bb) * 
+                            ((2 * aik[i] / a) - temp1) *
+                            log((Z + 2.414213562373095*bb) / (Z - 0.41421356237309515*bb)));
         }
 
     }
@@ -297,8 +303,9 @@ void pr_eos::getZ(bool Calc_phi)
     float (*fun)(float, std::shared_ptr<std::vector<float>>) = func;
     float (*funcd)(float, std::shared_ptr<std::vector<float>>) = Derivative_of_func;
 
-    for(const auto& i : parameters)
-        std::cout<<"\n"<<i;
+    // Print Parameters DEBUG
+    // for(const auto& i : parameters)
+        // std::cout<<"\n"<<i;
 
     // before solving anything lets find whether the equation has one or 3 real toots
     float Q1 = parameters[0]*parameters[1]/6 - parameters[2]/2 - pow(parameters[0],3)/27;
@@ -306,6 +313,7 @@ void pr_eos::getZ(bool Calc_phi)
     float D = Q1*Q1 - P1*P1*P1;
 
     if (D>=0){
+        no_of_root = 1;
         std::cout<<"\nonly one real root so going for newton raphson way\n";
         float f = 1;
         if(newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50))
@@ -313,6 +321,7 @@ void pr_eos::getZ(bool Calc_phi)
         std::cout<<"\nans : "<<z;
     }
     else{
+        no_of_root = 3;
         std::cout<<"\n\nhas three roots under cons\n\n";
 
         std::vector<float> ini;
@@ -343,6 +352,41 @@ void pr_eos::getZ(bool Calc_phi)
         std::cout<<"\nans : "<<z<<"\t"<<zl;
         
     }
-    if(cal_phi && Is_mix)
-        calc_phi(z);
+}
+
+void pr_eos::calc_dew()
+{
+    printf("\n vera maari vera maari \n");
+
+    phi_V_ptr = std::make_unique<std::vector<float>>();
+    phi_V_ptr->resize(size_of_gas_data);
+    std::fill(phi_V_ptr->begin(), phi_V_ptr->end(), 0);
+    calc_phi(z, phi_V_ptr);
+
+    for(const auto i : *phi_V_ptr)
+        std::cout<<i<<"\n";
+    
+    uint16_t j = 0;
+    float xi_total = 0;
+    float *xi = new float[size_of_gas_data];
+    for (const auto i : *base_data_pt){
+        xi[j] = i.yi / exp(log(i.pc / p) + (5.37269855031944 * (1 + i.w) * (1 - (i.tc / t))));;
+        xi_total = xi_total + xi[j];
+        j++;
+    }
+
+    // find xi_initial
+    // float* xi_norm = new float[10];
+    
+    j=0;
+    for (const auto i : *base_data_pt){
+        xi[j] = (xi[j] / xi_total);
+        estimated_temp = estimated_temp + i.tsat * xi[j];
+        j++;
+    }
+
+    delete[] xi;
+
+    printf("\n\nestimated temp is %f\n\n",estimated_temp);
+
 }
