@@ -58,6 +58,9 @@ private:
     float *xi_norm;
     bool should_I_use_yi = true;
 
+    std::shared_ptr<std::vector<float>> ini_p;
+
+
 // private member funcs
     void pr_mix_report(PR_props* pr);
     void PR_consts_Calc(base_props* gas_prop, PR_props* prprops);
@@ -108,9 +111,14 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
     
     base_data_pt = mydbclass.get_base_gas_props_ptr();
 
-    if(Is_mix)
+    if(Is_mix){
         bip_data_ptr = mydbclass.get_bip_pointer();
+        pr_mix_data.resize(size_of_gas_data);
 
+        ini_p = std::make_shared<std::vector<float>>();
+        ini_p->resize(3);
+        xi_norm = new float[size_of_gas_data];
+    }
     std::cout<<"PR class constructor called and finished \n\n";
 }
 
@@ -214,13 +222,16 @@ void pr_eos::pr_mix_props()
 // to implement, 
     // create pr_props vector
     // iterate through each base_gas_data and send to PR_const calc func
-    pr_mix_data.reserve(size_of_gas_data);
+    // pr_mix_data.reserve(size_of_gas_data);
     PR_props* ans = new PR_props;
 
+    uint16_t k = 0;
     if(base_data_pt)
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
             PR_consts_Calc(&(*i), ans);
-            pr_mix_data.push_back(*ans);
+            // pr_mix_data.push_back(*ans);
+            pr_mix_data.at(k) = *ans;
+            k++;
         }
     delete ans;
 
@@ -247,7 +258,7 @@ void pr_eos::pr_mix_props()
                 axij = (*base_data_pt)[i].yi * (*base_data_pt)[j].yi * aij;
             else
                 axij = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * aij;
-
+        
             // print matrix - DEBUG
             // std::cout<<t2<<"\t";
         
@@ -322,14 +333,18 @@ void pr_eos::getZ(bool Calc_phi)
         no_of_root = 3;
         std::cout<<"\nhas three roots - weistrass\n";
 
-        std::vector<float> ini;
-        ini.reserve(3);
+        // std::vector<float> ini;
+        // ini.reserve(3);
 
-        ini.push_back(0);
-        ini.push_back(0.5);
-        ini.push_back(1);
+        // ini.push_back(0);
+        // ini.push_back(0.5);
+        // ini.push_back(1);
 
-        std::shared_ptr<std::vector<float>> ini_p = std::make_shared<std::vector<float>>(ini);
+        // std::shared_ptr<std::vector<float>> ini_p = std::make_shared<std::vector<float>>(ini);
+
+        ini_p->at(0) = 0; 
+        ini_p->at(1) = 0.5; 
+        ini_p->at(2) = 1; 
 
         // for weistrass initial guess is VERY VERY IMPORTANT -------
         if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50)){
@@ -387,20 +402,24 @@ float pr_eos::dew_pt_calc(bool is_first_time)
     
     uint16_t j = 0;
     float xi_total = 0;
-    xi_norm = new float[size_of_gas_data];
     // for (auto& i : *base_data_pt){
     for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-        i->xi = i->yi / exp(log(i->pc / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));;
+        i->xi = i->yi / exp(log(i->pc * 0.000001 / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));
+        // std::cout<<"\nKi = "<<exp(log(i->pc * 0.000001 / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));
+        // i->xi = 1;
         xi_total = xi_total + i->xi;
         j++;
     }
+    print_base_data();
 
     // find xi_initial
     j=0;
     if(is_first_time)
-        for (const auto i : *base_data_pt){
-            xi_norm[j] = (i.xi / xi_total);
-            estimated_temp = estimated_temp + i.tsat * i.xi;
+        // for (const auto i : *base_data_pt){
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            // xi_norm[j] = (i.xi / xi_total);
+            i->xi = (i->xi / xi_total);
+            estimated_temp = estimated_temp + i->tsat * i->xi;
             j++;
         }
 
@@ -415,7 +434,7 @@ float pr_eos::dew_pt_calc(bool is_first_time)
     for (uint32_t i = 0; i < 20; i++){
         j=0;
         should_I_use_yi = false;
-        pr_mix_data.clear();
+        // pr_mix_data.clear();
         getZ(cal_phi);
         if(zl<=0)
             break;
@@ -428,15 +447,17 @@ float pr_eos::dew_pt_calc(bool is_first_time)
 
         // update xi using the yi, phi_v and phi_l
         j=0;
-        for(auto i : *base_data_pt){
-            i.xi = i.yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
-            xi_total_new = xi_total_new + i.xi;
+        // for(auto i : *base_data_pt){
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            i->xi = i->yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
+            xi_total_new = xi_total_new + i->xi;
             j++;
         }
 
         j = 0;
-        for(auto i : *base_data_pt){
-            i.xi = i.xi / xi_total_new;
+        // for(auto i : *base_data_pt){
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            i->xi = i->xi / xi_total_new;
             j++;
         }
 
