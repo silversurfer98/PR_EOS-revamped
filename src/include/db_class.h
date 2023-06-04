@@ -8,7 +8,7 @@ struct CP_Const
 
 struct base_props
 {
-    float tc, pc, w, yi, tsat;
+    float tc, pc, w, yi, xi, tsat;
 };
 
 // --------------------------------------------------------

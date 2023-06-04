@@ -53,7 +53,10 @@ private:
     uint16_t no_of_root = 0;
     // for dew pt calc
     std::unique_ptr<std::vector<float>> phi_V_ptr;
+    std::unique_ptr<std::vector<float>> phi_L_ptr;
     float estimated_temp = 0;
+    float *xi_norm;
+    bool should_I_use_yi = true;
 
 // private member funcs
     void pr_mix_report(PR_props* pr);
@@ -61,6 +64,8 @@ private:
     void pr_mix_props();
     void pr_single_gas_props();
     void calc_phi(float z, std::unique_ptr<std::vector<float>>& phi);
+    float dew_pt_calc(bool is_first_time);
+
 
 public:
 // public variables
@@ -89,7 +94,7 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
     parameters.reserve(3);
     for(uint16_t i = 0;i<3;i++)
         parameters.push_back(1.0);
-    
+    estimated_temp = 0.0;
  
     unsigned int res = mydbclass.get_all_gas_names();
     if(res==0)
@@ -111,6 +116,7 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
 
 pr_eos::~pr_eos()
 {
+    delete[] xi_norm;
     std::cout<<"\n\nPR_EOS destructor has been called\n\n";
 }
 
@@ -119,9 +125,9 @@ void pr_eos::print_base_data()
 {
     std::cout<<"\n\n";
     if(base_data_pt){
-        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Yi"<<"\t"<<"Tsat"<<"\n";
+        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Yi"<<"\t"<<"Xi"<<"\t"<<"Tsat"<<"\n";
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->yi<<"\t"<<i->tsat<<"\n";
+            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->yi<<"\t"<<i->xi<<"\t"<<i->tsat<<"\n";
     }
     else
         std::cout<<"\nenakune varuveengala da\n";
@@ -170,7 +176,7 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
     // prprops->c = (1 - prprops->bb);
     // prprops->d = (prprops->aa - 2 * prprops->bb - 3 * prprops->bb * prprops->bb);
     // prprops->e = (prprops->aa * prprops->bb - prprops->bb * prprops->bb - prprops->bb * prprops->bb * prprops->bb);
-    gas_prop->tsat = gas_prop->tc / (1 - 3 * log(p / gas_prop->pc) / (16.11809565095832 * (1 + gas_prop->w)));
+    gas_prop->tsat = gas_prop->tc / (1 - 3 * log(p / (gas_prop->pc * 0.000001)) / (16.11809565095832 * (1 + gas_prop->w)));
 
 }
 
@@ -226,6 +232,7 @@ void pr_eos::pr_mix_props()
         aik.resize(size_of_gas_data);
         std::fill(aik.begin(), aik.end(),0.0);
     }
+
     float aij, axij, x, y;
     aa = 0; bb = 0; a = 0; b = 0;
     for (unsigned int i = 0; i < size_of_gas_data; i++)
@@ -235,22 +242,34 @@ void pr_eos::pr_mix_props()
         {
             y = (pr_mix_data[j].a);
             aij = sqrt(x * y) * (1 - (*bip_data_ptr)[i][j]);
-            // t1 = sqrt((pr_mix_data[i].a) * (pr_mix_data[j].a)) * (1 - (*bip_data_ptr)[i][j]);
-            axij = (*base_data_pt)[i].yi * (*base_data_pt)[j].yi * aij;
-        
+
+            if(should_I_use_yi)
+                axij = (*base_data_pt)[i].yi * (*base_data_pt)[j].yi * aij;
+            else
+                axij = (*base_data_pt)[i].xi * (*base_data_pt)[j].xi * aij;
+
             // print matrix - DEBUG
             // std::cout<<t2<<"\t";
         
             a = a + axij;
 
-            if(cal_phi)
-                aik[j] = aik[j] + (*base_data_pt)[i].yi * aij;
+            if(cal_phi){
+                if(should_I_use_yi)
+                    aik[j] = aik[j] + (*base_data_pt)[i].yi * aij;
+                else
+                    aik[j] = aik[j] + (*base_data_pt)[i].xi * aij;
+            }
+                
         }
         // std::cout<<"\n";
     }
 
-    for (unsigned int i = 0; i < size_of_gas_data; i++)
-        b = b + ((*base_data_pt)[i].yi * pr_mix_data[i].b);
+    for (unsigned int i = 0; i < size_of_gas_data; i++){
+        if(should_I_use_yi)
+            b = b + ((*base_data_pt)[i].yi * pr_mix_data[i].b);
+        else
+            b = b + ((*base_data_pt)[i].xi * pr_mix_data[i].b);
+    }
 
     // these are the results to solve for Z
     aa = a * p / (r * r * t * t);  // A constant for Z-equation
@@ -267,27 +286,6 @@ void pr_eos::pr_mix_props()
     parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
 }
 // --------------------------------
-void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
-{
-    // totally under construction
-    // printf("\n vera maari vera maari \n");
-    float temp1 = 0;
-    for(uint16_t i=0;i<size_of_gas_data;i++)
-    {
-        temp1 = pr_mix_data[i].b / b;
-
-        if(Z!=0 && (*base_data_pt)[i].yi!=0)
-        {
-            phi->at(i) = exp(((temp1) * (Z - 1)) - 
-                            (log(Z - bb)) -
-                            (0.35355339059327373 * aa / bb) * 
-                            ((2 * aik[i] / a) - temp1) *
-                            log((Z + 2.414213562373095*bb) / (Z - 0.41421356237309515*bb)));
-        }
-
-    }
-}
-
 void pr_eos::getZ(bool Calc_phi)
 {
     cal_phi = Calc_phi;
@@ -322,7 +320,7 @@ void pr_eos::getZ(bool Calc_phi)
     }
     else{
         no_of_root = 3;
-        std::cout<<"\n\nhas three roots under cons\n\n";
+        std::cout<<"\nhas three roots - weistrass\n";
 
         std::vector<float> ini;
         ini.reserve(3);
@@ -353,8 +351,28 @@ void pr_eos::getZ(bool Calc_phi)
         
     }
 }
+// ------------------------------- dew pt calc --------------------
+void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
+{
+    // totally under construction
+    // printf("\n vera maari vera maari \n");
+    float temp1 = 0;
+    for(uint16_t i=0;i<size_of_gas_data;i++)
+    {
+        temp1 = pr_mix_data[i].b / b;
 
-void pr_eos::calc_dew()
+        // if(Z!=0 && (*base_data_pt)[i].yi!=0)
+        if(Z!=0)
+            phi->at(i) = exp(((temp1) * (Z - 1)) - 
+                            (log(Z - bb)) -
+                            (0.35355339059327373 * aa / bb) * 
+                            ((2 * aik[i] / a) - temp1) *
+                            log((Z + 2.414213562373095*bb) / (Z - 0.41421356237309515*bb)));
+
+    }
+}
+
+float pr_eos::dew_pt_calc(bool is_first_time)
 {
     printf("\n vera maari vera maari \n");
 
@@ -363,30 +381,108 @@ void pr_eos::calc_dew()
     std::fill(phi_V_ptr->begin(), phi_V_ptr->end(), 0);
     calc_phi(z, phi_V_ptr);
 
+    printf("\n Phi vapour values \n");
     for(const auto i : *phi_V_ptr)
         std::cout<<i<<"\n";
     
     uint16_t j = 0;
     float xi_total = 0;
-    float *xi = new float[size_of_gas_data];
-    for (const auto i : *base_data_pt){
-        xi[j] = i.yi / exp(log(i.pc / p) + (5.37269855031944 * (1 + i.w) * (1 - (i.tc / t))));;
-        xi_total = xi_total + xi[j];
+    xi_norm = new float[size_of_gas_data];
+    // for (auto& i : *base_data_pt){
+    for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+        i->xi = i->yi / exp(log(i->pc / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));;
+        xi_total = xi_total + i->xi;
         j++;
     }
 
     // find xi_initial
-    // float* xi_norm = new float[10];
-    
     j=0;
-    for (const auto i : *base_data_pt){
-        xi[j] = (xi[j] / xi_total);
-        estimated_temp = estimated_temp + i.tsat * xi[j];
-        j++;
+    if(is_first_time)
+        for (const auto i : *base_data_pt){
+            xi_norm[j] = (i.xi / xi_total);
+            estimated_temp = estimated_temp + i.tsat * i.xi;
+            j++;
+        }
+
+
+    // find the phi l
+    phi_L_ptr = std::make_unique<std::vector<float>>();
+    phi_L_ptr->resize(size_of_gas_data);
+    std::fill(phi_L_ptr->begin(), phi_L_ptr->end(), 0);
+
+    float xi_total_tolerance = 1e-06, xi_total_new = 0;
+    // loop to refine xi
+    for (uint32_t i = 0; i < 20; i++){
+        j=0;
+        should_I_use_yi = false;
+        pr_mix_data.clear();
+        getZ(cal_phi);
+        if(zl<=0)
+            break;
+
+        calc_phi(zl,phi_L_ptr);
+
+        printf("\n Phi liquid values at %dth iteration \n", i);
+        for(const auto i : *phi_L_ptr)
+            std::cout<<i<<"\n";
+
+        // update xi using the yi, phi_v and phi_l
+        j=0;
+        for(auto i : *base_data_pt){
+            i.xi = i.yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
+            xi_total_new = xi_total_new + i.xi;
+            j++;
+        }
+
+        j = 0;
+        for(auto i : *base_data_pt){
+            i.xi = i.xi / xi_total_new;
+            j++;
+        }
+
+        print_base_data();
+
+        if(abs(xi_total_new - xi_total) <= xi_total_tolerance)
+            break;
+        
+        xi_total = xi_total_new;
+
     }
 
-    delete[] xi;
+    return xi_total - 1;
+}
 
+void pr_eos::calc_dew()
+{
+    float t2 = 0, t1 = 0, fx = 0, tnew = 0;
+
+    dew_pt_calc(true);
     printf("\n\nestimated temp is %f\n\n",estimated_temp);
+
+    t1 = estimated_temp - 25.0;
+    t2 = estimated_temp + 25.0;
+    
+    //secant
+    // uint16_t iters = 25;
+    // float tn = 0, ft, ftt, tolerance=1e-03;
+    // for (uint16_t i = 0; i < iters; i++)
+    // {
+    //     t = t1;
+    //     ft = dew_pt_calc(false);
+    //     t = t2;
+    //     ftt = dew_pt_calc(false);
+    //     float temp = (ft - ftt);
+    //     if (abs(temp) <= tolerance)
+    //     {
+    //         std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
+    //         break;
+    //     }
+    //     tn = t1 - ft * ((t1 - t2) / (ft - ftt));
+
+    //     t1 = t2;
+    //     t2 = tn;
+        
+    //     std::cout << "\n\nat the end of every secant loop --> " << tn << "\n\n";
+    // }
 
 }

@@ -15,7 +15,7 @@ struct CP_Const
 //gas base properties definition
 struct base_props
 {
-    float tc, pc, w, yi = 0, tsat = 0;
+    float tc, pc, w, yi = 0, xi=0, tsat = 0;
 };
 
 class db_class
@@ -382,7 +382,7 @@ unsigned int db_class::get_base_gas_props()
             if(sqlite3_step(stmt) == 100){
                 base_props temp { (float)sqlite3_column_double(stmt, 0),
                                   (float)sqlite3_column_double(stmt, 1),
-                                  (float)sqlite3_column_double(stmt, 2), 1, 0};
+                                  (float)sqlite3_column_double(stmt, 2), 1, 0, 0};
                 base_gas_props.push_back(temp);
             }
                 
