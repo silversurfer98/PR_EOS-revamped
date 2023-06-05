@@ -55,7 +55,7 @@ private:
     std::unique_ptr<std::vector<float>> phi_V_ptr;
     std::unique_ptr<std::vector<float>> phi_L_ptr;
     float estimated_temp = 0;
-    float *xi_norm;
+    float *xi_not_norm;
     bool should_I_use_yi = true;
 
     std::shared_ptr<std::vector<float>> ini_p;
@@ -78,26 +78,25 @@ public:
     db_class mydbclass;
 
 // public member funcs
-    pr_eos(float pressure, float temperature, const char* db_name);
+    pr_eos(float pressure, float temperature, const char* db_name, bool Calc_phi);
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-    void getZ(bool Calc_phi);
+    void getZ();
     void calc_dew();
 };
 
-pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(db_n)
+pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_phi) : mydbclass(db_n)
 {
     p = pressure*0.1 - 0.101325;
     // p = 0.000001 * (pressure*100000 - 101325);
     t = temperature + 273.15;
     // mydbclass = new db_class(db_n);
-    
+    cal_phi = Calc_phi;
     z = 1; zl = 0;
     parameters.reserve(3);
     for(uint16_t i = 0;i<3;i++)
         parameters.push_back(1.0);
-    estimated_temp = 0.0;
  
     unsigned int res = mydbclass.get_all_gas_names();
     if(res==0)
@@ -117,14 +116,23 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n) : mydbclass(
 
         ini_p = std::make_shared<std::vector<float>>();
         ini_p->resize(3);
-        xi_norm = new float[size_of_gas_data];
+        if(cal_phi){
+            estimated_temp = 0.0;
+            xi_not_norm = new float[size_of_gas_data];
+
+            phi_V_ptr = std::make_unique<std::vector<float>>();
+            phi_V_ptr->resize(size_of_gas_data);
+
+            phi_L_ptr = std::make_unique<std::vector<float>>();
+            phi_L_ptr->resize(size_of_gas_data);
+        }
     }
     std::cout<<"PR class constructor called and finished \n\n";
 }
 
 pr_eos::~pr_eos()
 {
-    delete[] xi_norm;
+    delete[] xi_not_norm;
     std::cout<<"\n\nPR_EOS destructor has been called\n\n";
 }
 
@@ -297,9 +305,8 @@ void pr_eos::pr_mix_props()
     parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
 }
 // --------------------------------
-void pr_eos::getZ(bool Calc_phi)
+void pr_eos::getZ()
 {
-    cal_phi = Calc_phi;
     if(Is_mix)
         pr_mix_props();
     else
@@ -371,15 +378,14 @@ void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
 {
     // totally under construction
     // printf("\n vera maari vera maari \n");
-    float temp1 = 0;
+    float temp1 = 0, temp2 = 0;
     for(uint16_t i=0;i<size_of_gas_data;i++)
     {
         temp1 = pr_mix_data[i].b / b;
-
-        // if(Z!=0 && (*base_data_pt)[i].yi!=0)
-        if(Z!=0)
+        temp2 = Z - bb;
+        if(Z!=0 && temp2>0)
             phi->at(i) = exp(((temp1) * (Z - 1)) - 
-                            (log(Z - bb)) -
+                            (log(temp2)) -
                             (0.35355339059327373 * aa / bb) * 
                             ((2 * aik[i] / a) - temp1) *
                             log((Z + 2.414213562373095*bb) / (Z - 0.41421356237309515*bb)));
@@ -389,53 +395,56 @@ void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
 
 float pr_eos::dew_pt_calc(bool is_first_time)
 {
-    printf("\n vera maari vera maari \n");
 
-    phi_V_ptr = std::make_unique<std::vector<float>>();
-    phi_V_ptr->resize(size_of_gas_data);
-    std::fill(phi_V_ptr->begin(), phi_V_ptr->end(), 0);
+    // calculate Phi_Y since anyway
+    std::fill(phi_V_ptr->begin(), phi_V_ptr->end(), 1);
     calc_phi(z, phi_V_ptr);
 
+    // report Phi_Y values
     printf("\n Phi vapour values \n");
     for(const auto i : *phi_V_ptr)
         std::cout<<i<<"\n";
     
     uint16_t j = 0;
     float xi_total = 0;
-    // for (auto& i : *base_data_pt){
-    for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-        i->xi = i->yi / exp(log(i->pc * 0.000001 / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));
-        // std::cout<<"\nKi = "<<exp(log(i->pc * 0.000001 / p) + (5.37269855031944 * (1 + i->w) * (1 - (i->tc / t))));
-        // i->xi = 1;
-        xi_total = xi_total + i->xi;
+    // for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+    for (const auto& i : *base_data_pt){
+        xi_not_norm[j] = i.yi / exp(log((i.pc * 0.000001) / p) + (5.37269855031944 * (1 + i.w) * (1 - (i.tc / t))));
+        xi_total = xi_total + xi_not_norm[j];
         j++;
     }
-    print_base_data();
 
     // find xi_initial
     j=0;
-    if(is_first_time)
-        // for (const auto i : *base_data_pt){
+    if(is_first_time){
+        estimated_temp = 0;
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-            // xi_norm[j] = (i.xi / xi_total);
-            i->xi = (i->xi / xi_total);
+            i->xi = (xi_not_norm[j] / xi_total);
             estimated_temp = estimated_temp + i->tsat * i->xi;
             j++;
         }
+        return 0;
+    }
+
+
+    for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+        i->xi = (xi_not_norm[j] / xi_total);
+        j++;
+    }
 
 
     // find the phi l
-    phi_L_ptr = std::make_unique<std::vector<float>>();
-    phi_L_ptr->resize(size_of_gas_data);
-    std::fill(phi_L_ptr->begin(), phi_L_ptr->end(), 0);
+    std::fill(phi_L_ptr->begin(), phi_L_ptr->end(), 1);
 
     float xi_total_tolerance = 1e-06, xi_total_new = 0;
+    xi_total = 0;
     // loop to refine xi
     for (uint32_t i = 0; i < 20; i++){
         j=0;
         should_I_use_yi = false;
         // pr_mix_data.clear();
-        getZ(cal_phi);
+        zl=0;
+        getZ();
         if(zl<=0)
             break;
 
@@ -446,37 +455,38 @@ float pr_eos::dew_pt_calc(bool is_first_time)
             std::cout<<i<<"\n";
 
         // update xi using the yi, phi_v and phi_l
-        j=0;
-        // for(auto i : *base_data_pt){
-        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-            i->xi = i->yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
-            xi_total_new = xi_total_new + i->xi;
+        j=0; xi_total_new=0;
+        for(auto& i : *base_data_pt){
+            xi_not_norm[j] = i.yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
+            xi_total_new = xi_total_new + xi_not_norm[j];
             j++;
         }
 
         j = 0;
-        // for(auto i : *base_data_pt){
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
-            i->xi = i->xi / xi_total_new;
+            i->xi = xi_not_norm[j] / xi_total_new;
             j++;
         }
 
-        print_base_data();
 
         if(abs(xi_total_new - xi_total) <= xi_total_tolerance)
             break;
+        
+        printf("\nvalues at %dth iteration \n", i);
+        print_base_data();
         
         xi_total = xi_total_new;
 
     }
 
-    return xi_total - 1;
+    return xi_total_new - 1;
 }
 
 void pr_eos::calc_dew()
 {
     float t2 = 0, t1 = 0, fx = 0, tnew = 0;
 
+    getZ();
     dew_pt_calc(true);
     printf("\n\nestimated temp is %f\n\n",estimated_temp);
 
@@ -484,26 +494,26 @@ void pr_eos::calc_dew()
     t2 = estimated_temp + 25.0;
     
     //secant
-    // uint16_t iters = 25;
-    // float tn = 0, ft, ftt, tolerance=1e-03;
-    // for (uint16_t i = 0; i < iters; i++)
-    // {
-    //     t = t1;
-    //     ft = dew_pt_calc(false);
-    //     t = t2;
-    //     ftt = dew_pt_calc(false);
-    //     float temp = (ft - ftt);
-    //     if (abs(temp) <= tolerance)
-    //     {
-    //         std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
-    //         break;
-    //     }
-    //     tn = t1 - ft * ((t1 - t2) / (ft - ftt));
+    uint16_t iters = 25;
+    float tn = 0, ft, ftt, tolerance=1e-06;
+    for (uint16_t i = 0; i < iters; i++)
+    {
+        t = t1;
+        ft = dew_pt_calc(false);
+        t = t2;
+        ftt = dew_pt_calc(false);
+        float temp = (ft - ftt);
+        if (abs(temp) <= tolerance)
+        {
+            std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
+            break;
+        }
+        tn = t1 - ft * ((t1 - t2) / (ft - ftt));
 
-    //     t1 = t2;
-    //     t2 = tn;
+        t1 = t2;
+        t2 = tn;
         
-    //     std::cout << "\n\nat the end of every secant loop --> " << tn << "\n\n";
-    // }
-
+        std::cout << "\n\nat the end of every secant loop --> " << tn << "\n\n";
+    }
+    std::cout<<"\n\n tempe is : "<<tn-273.15<<"\n\n";
 }

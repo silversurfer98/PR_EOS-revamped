@@ -18,11 +18,11 @@ public:
     db_class mydbclass;
 
 // public member funcs
-    pr_eos(float pressure, float temperature, const char* db_name);
+    pr_eos(float pressure, float temperature, const char* db_name, bool calc_dewpt);
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-    void getZ(bool Calc_phi);
+    void getZ();
     void calc_dew();
     
 };
