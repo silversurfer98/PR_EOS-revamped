@@ -16,10 +16,7 @@ public:
     float z, zl;
     float p, t;
     bool use_trig_method;
-    float root_precision;
-    uint16_t max_root_find_iterations;
-    float xi_total_tolerance;
-    bool print_debug_data;
+
     db_class mydbclass;
 
 // public member funcs
@@ -29,5 +26,12 @@ public:
     void print_bip_data();
     void getZ();
     void calc_dew();
+
+    //config
+    void set_use_trig_method(bool use_trig_method_f);
+    void set_print_debug_data(bool print_debug_data_f);
+    void set_max_root_find_iterations(uint16_t max_root_find_iterations_f);
+    void set_root_precision(float root_precision_f);
+    void set_xi_total_tolerance(float xi_total_tolerance_f);
     
 };

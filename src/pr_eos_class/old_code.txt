@@ -1,196 +1,66 @@
-reff
+void pr_eos::calc_cp()
+{
+    getZ();
+    //cp const data
+    // std::unique_ptr<std::vector<CP_Const>> cp_const = mydbclass.get_cp_const_pointer();
+    // CpIG = A + B.T + C.T² + D.T³
+    // float* cp_R = new float[size_of_gas_data];
+    float cp_ig = 0; // gives the Cp in CAL/G-MOLE-K
+    uint16_t j = 0;
+    for(const auto& i : *base_data_pt)
+        cp_ig = cp_ig +  i.yi*(cp_const->at(j).A + t_reserve*cp_const->at(j).B 
+                                + t_reserve*t_reserve*cp_const->at(j).C
+                                + t_reserve*t_reserve*t_reserve*cp_const->at(j).D);
 
-float xi_total_tolerance = 0.000001, xi_total_old = 0, xi_total_new = 0;
-    for (uint32_t i = 0; i < 20; i++)
+    cp_ig = 4.1868 * cp_ig; // converted to J / mol . K
+    float cv_ig = cp_ig - r;
+
+    // now the struggle starts
+    float cp_r = 0, cv_r = 0;
+    j=0;
+    p = p * 1000000; //change to pascals
+    float v = ((z * r * t) / p);
+    for(const auto& i : pr_mix_data)
     {
-        //std::cout << "**************** temp --> " << t << "\n\n";
-        PR_props* prprops_l = new PR_props;
-        PR_consts_Calc_mix_dewT(p, t, xi_norm, prmix, prprops_l, xi_aik);
+        // step 1
+        float dPdVatT = ((-r * t) / ((v - i.b) * (v - i.b))) + 2 * i.a * (v + i.b) / ((v * (v + i.b) + i.b * (v - i.b)) * (v * (v + i.b) + i.b * (v - i.b)));
+        
+        // step 2
+        float dadTatV = -i.k * i.ac / (sqrt(t * base_data_pt->at(j).tc) * (1 + i.k * (1 - sqrt(t / base_data_pt->at(j).tc))));
+        float dPdTatV = r / (v - i.b) - dadTatV / (v * (v + i.b) + i.b * (v - i.b));
+        float dTdPatV = 1 / dPdTatV;
 
-        z1 = 1; z2 = 0; // zv, zl
-        find_soln(prprops_l, &z1, &z2);
-        if (z2 <= 0)
-            break;
-        fugacity_coeff(prmix, prprops_l, z2, xi_aik, xi_norm, fug_liq);
-        update_xi(x,xi,fug_vap,fug_liq);
-        //std::cout<<"\n\n---------- report on comp after update "<<i<<" ---------------\n\n";
+        // step 3 
+        float daadTatP = (p / (r * r * t_reserve * t_reserve)) * (dadTatV - 2 * i.a / t_reserve);
+        float dbbdTatP = -b * p / (r * t_reserve * t_reserve);
 
-        xi_total_old = xi_total;
-        xi_total = 0;
-        for (uint16_t j = 0; j < 10; j++)
-        {
-            xi_total = xi_total + xi[j];
-            //std::cout<<gas_names[j]<<" xi : "<<xi[j]<<"\n";
-        }
-        xi_total_new = xi_total;
-        for (uint16_t k = 0; k < 10; k++)
-            xi_norm[k] = (xi[k] / xi_total);
-        //std::cout << "\n\n de otha plese be the ans inside func --> " << xi_total << "\n\n";
+        float Num = daadTatP * (bb - z) + dbbdTatP * (6 * bb * z + 2 * z - 3 * bb * bb - 2 * bb + aa - z * z);
+        float Denom = 3 * z * z + 2 * (bb - 1) * z + (aa - 2 * bb - 3 * bb * bb);
 
-        if (abs(xi_total_new - xi_total_old) <= xi_total_tolerance) {
-            //std::cout << "\n\n how many iterations i took inside liq --> " << i << "\n\n";
-            break;
+        float dZdTatP = Num / Denom;
 
-        }
-        delete prprops_l;
-        //std::cout << "\n\n from func ---------- " << xi_total << " at " << i << "th iteration" << "\n\n\n";
+        float dVdTatP = (r / p) * (t_reserve * dZdTatP + z);
 
+
+
+        // last step to success
+        float aDoubleDash = i.ac * i.k * (1 + i.k) * sqrt(base_data_pt->at(j).tc / t_reserve) / (2 * t_reserve * base_data_pt->at(j).tc);
+        float Cvr = (t_reserve * aDoubleDash / (i.b * sqrt(8))) * log((z + bb * (1 + sqrt(2))) / (z + bb * (1 - sqrt(2))));
+        float Cpr = Cvr + t_reserve * dPdTatV * dVdTatP - r;
+        
+        // atlast
+        cp_r = cp_r + Cpr;
+        cv_r = cv_r + Cvr;
+        j++;
     }
-    delete[] prmix;
-    delete[] fug_liq;
-    delete[] fug_vap;
-    delete[] xi_aik;
-    delete[] xi;
-    delete[] xi_norm;
 
-    return xi_total - 1;
-    //return xi_total;
-
+    cp = cp_r + cp_ig;
+    cv = cv_r + cv_ig;
 }
 
-// root finders
-float steffenson_method(float p, float* x, base_props* gas, uint16_t iters, float tol)
+float pr_eos::get_cp()
 {
-    //https://en.wikipedia.org/wiki/Steffensen%27s_method
-    float tnew = 0, told = 273.15;
-
-    told = dewt_func(p, told, gas, x, true);
-    std::cout << "\n\nnow told is --> " << told << "\n\n";
-
-    float fx = 0, fxh = 0, temp = 0, gx = 0;
-    for (uint16_t i = 0; i < iters; i++)
-    {
-        fx = dewt_func(p, told, gas, x, false);
-        fxh = dewt_func(p, told + fx, gas, x, false);
-        if(fx<=tol || fxh<=tol)
-        {
-            std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
-            break;
-        }
-        gx = (fxh / fx) - 1;
-        temp = fx / gx;
-       
-        tnew = told - temp;
-        /*if (abs(told - tnew) <= 0.00001) 
-        {
-            std::cout << "\n\n i have been cancelled how many iterations i took --> " << i << "\n\n";
-            break;
-        }*/
-        told = tnew;
-
-        std::cout << "\n\nat the end of every Steffensen's --> " << told << "\n\n";
-    }
-
-    return told;
-}
-
-float secant_method(float p, float* x, base_props* gas, uint16_t iters, float tolerance)
-{
-    //https://en.wikipedia.org/wiki/Secant_method#:~:text=In%20numerical%20analysis%2C%20the%20secant,difference%20approximation%20of%20Newton's%20method.
-    float t2 = 0, t1 = 0, fx = 0, tnew = 0, t_estimated = 273.15;
-
-    t_estimated = dewt_func(p, t_estimated, gas, x, true);
-    std::cout << "\n\nnow told is --> " << t_estimated << "\n\n";
-
-    t1 = t_estimated - 25.0;
-    t2 = t_estimated + 25.0;
-
-    //secant
-    float tn = 0, ft, ftt;
-    for (uint16_t i = 0; i < iters; i++)
-    {
-        ft = dewt_func(p, t1, gas, x, false);
-        ftt = dewt_func(p, t2, gas, x, false);
-        float temp = (ft - ftt);
-        if (abs(temp) <= tolerance)
-        {
-            std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
-            break;
-        }
-        tn = t1 - ft * ((t1 - t2) / (ft - ftt));
-
-        t1 = t2;
-        t2 = tn;
-        /*if (abs(told - tnew) <= 0.00001)
-        {
-            std::cout << "\n\n i have been cancelled how many iterations i took --> " << i << "\n\n";
-            break;
-        }
-        told = tnew;*/
-
-        std::cout << "\n\nat the end of every secant loop --> " << tn << "\n\n";
-    }
-    return t2;
-
-}
-
-
-float dewt_find()
-{
-
-    base_props* gprops = new base_props;
-
-    float* x = new float[10];
-
-    prepData(gprops, x, 0);
-
-    // ---------------  TESTING PURPOSE --------
-    /*gprops->p = 3.0e+05;
-    gprops->t = 45 + 273.15;
-    gprops->pc = 0;
-    gprops->tc = 0;
-    gprops->w = 0;
-
-    for (uint16_t i = 0; i < 10; i++)
-        x[i] = 0;
-    x[1] = 0.8333;
-    x[2] = 0.1667;*/
-    // ----------------------------------------
-
-    base_props* gas = new base_props[10];
-
-    std::cout << "\n\n Do u wanna update props from DB (y/n) --> ";
-    char c;
-    std::cin >> c;
-    if (c == 'y' || c=='Y')
-    {
-        // update from the database
-        sqlite3* db = opendb("props.db");
-        update_gasprops_fromDB(db);
-        sqlite3_close(db);
-    }
-    else
-        std::cout << "\n\nyour wish !!!! \n\n";
-
-
-    // prepare gas
-    for (unsigned int i = 0; i < 10; i++)
-    {
-        gas[i].p = gprops->p;
-        gas[i].t = gprops->t;
-        gas[i].tc = tcm[i];
-        gas[i].pc = pcm[i];
-        gas[i].w = wm[i];
-    }
-    //float ans = dewt_func(gprops->p, gprops->t, gas, x);
-    
-    // steffenson's is very divergent at lower tolerances 
-    //float ans = steffenson_method(gprops->p, x, gas, 10, 1e-04);
-
-    //IDK why this works but it works
-    float ans = secant_method(gprops->p, x, gas, 10, 1e-05);
-
-
-    std::cout << "\n\n dew point ---> " << ans - 273.15 << " Deg. cel\n\n\n";
-
-    delete[] gas;
-    delete gprops;
-    delete[] x;
-    return ans;
-}
-
-int main()
-{
-    float dewpt = dewt_find();
-    return 0;
+    calc_cp();
+    std::cout<<"\n\ncp value is "<<cp<<"\n\n";
+    return cp;
 }

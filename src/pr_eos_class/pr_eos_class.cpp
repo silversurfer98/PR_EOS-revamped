@@ -77,11 +77,12 @@ public:
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     float z, zl;
     float p, t;
-    bool use_trig_method;
-    float root_precision;
-    uint16_t max_root_find_iterations;
-    float xi_total_tolerance;
-    bool print_debug_data;
+    //config
+    bool use_trig_method                = false;
+    float root_precision                = 1e-05;
+    uint16_t max_root_find_iterations   = 50;
+    float xi_total_tolerance            = 1e-06;
+    bool print_debug_data               = false;
     db_class mydbclass;
 
 // public member funcs
@@ -91,6 +92,13 @@ public:
     void print_bip_data();
     void getZ();
     void calc_dew();
+
+    //config
+    void set_use_trig_method(bool use_trig_method_f);
+    void set_print_debug_data(bool print_debug_data_f);
+    void set_max_root_find_iterations(uint16_t max_root_find_iterations_f);
+    void set_root_precision(float root_precision_f);
+    void set_xi_total_tolerance(float xi_total_tolerance_f);
 };
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_phi) : mydbclass(db_n)
@@ -149,6 +157,28 @@ pr_eos::~pr_eos()
     delete[] xi_not_norm;
     if(print_debug_data)
         std::cout<<"\n\nPR_EOS destructor has been called\n\n";
+}
+
+//config
+void pr_eos::set_use_trig_method(bool use_trig_method_f)
+{
+    use_trig_method = use_trig_method_f;   
+}
+void pr_eos::set_print_debug_data(bool print_debug_data_f)
+{
+    print_debug_data= print_debug_data_f;   
+}
+void pr_eos::set_max_root_find_iterations(uint16_t max_root_find_iterations_f)
+{
+    max_root_find_iterations = max_root_find_iterations_f;   
+}
+void pr_eos::set_root_precision(float root_precision_f)
+{
+    root_precision = root_precision_f;   
+}
+void pr_eos::set_xi_total_tolerance(float xi_total_tolerance_f)
+{
+    xi_total_tolerance = xi_total_tolerance_f;   
 }
 
 // print funcs
@@ -423,6 +453,7 @@ void pr_eos::getZ()
             std::cout<<"\nans : "<<z<<"\t"<<zl;
         
     }
+    std::cout<<"\nCompressibility factors are : "<<z<<"\t"<<zl<<"\n";
 }
 // ------------------------------- dew pt calc --------------------
 void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)

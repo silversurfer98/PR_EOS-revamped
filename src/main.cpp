@@ -46,10 +46,10 @@ void testPRclass()
     // std::cin>>t;
 
     pr_eos eos(5, 40, "props.db", true);
-    eos.print_debug_data = true;
+    // eos.set_print_debug_data(true);
     // eos.print_bip_data();
-    // eos.getZ();
-    eos.calc_dew();
+    eos.getZ();
+    // eos.calc_dew();
     eos.print_base_data();
 
 
