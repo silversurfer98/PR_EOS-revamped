@@ -45,7 +45,8 @@ void testPRclass()
     // std::cout<<"Enter temperature in celcius : ";
     // std::cin>>t;
 
-    pr_eos eos(4, 40, "props.db", true);
+    pr_eos eos(5, 40, "props.db", true);
+    eos.print_debug_data = true;
     // eos.print_bip_data();
     // eos.getZ();
     eos.calc_dew();

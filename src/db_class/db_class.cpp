@@ -83,16 +83,12 @@ db_class:: db_class(const char* custom_filename)
 
 db_class:: ~db_class()
 {
-    std::cout<<"\n\nDB_class destructor has been called\n\n";
-    // sqlite3_close(db);
+    std::cout<<"\n\nDB_class destroyed\n\n";
 }
 
 unsigned int db_class:: get_all_gas_names()
 {
-    // check whether db is open
-    // if (!Is_database_open)
-    //     return 2;
-    
+
     // sql querry
     // select gas_name from base_gas_prop where id<=(SELECT MAX(id) FROM base_gas_prop);
     querry.erase();
@@ -208,8 +204,6 @@ unsigned int db_class::get_no_of_gases(){
 
 unsigned int db_class::prepare_bip()
 {
-    // if (!Is_database_open)
-    //     return 2;
 
     if(!is_set_created)
         return 3;
@@ -278,7 +272,6 @@ unsigned int db_class::prepare_bip()
 std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
 {
     unsigned int res = prepare_bip();
-    // std::cout<<"\n\nres : "<<res<<"\n\n";
     if(res==0)
         return std::move(bip_pointer);
     else
@@ -287,9 +280,6 @@ std::unique_ptr<std::vector<std::vector<float>>> db_class::get_bip_pointer()
 
 unsigned int db_class::cp_const_data_aquisition()
 {
-    // if (!Is_database_open)
-    //     return 2;
-
     if(!is_set_created)
         return 3;
 

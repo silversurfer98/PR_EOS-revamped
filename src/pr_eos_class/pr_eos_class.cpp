@@ -8,6 +8,8 @@
 #include "maths.h"
 #include "db_class.h"
 
+#include <iomanip>
+
 //PR EOS properties definition
 struct PR_props
 {
@@ -19,14 +21,14 @@ const float r = 8.3144598; // unit ---> J / K ⋅ mol
 float func(float value, std::shared_ptr<std::vector<float>> parameters)
 {
     // f(Z) = Z3 - CZ2 + DZ - E = 0
-    return pow(value, 3) - (*parameters)[0] * pow(value, 2) + (*parameters)[1] * value - (*parameters)[2];
+    return pow(value, 3) + (*parameters)[0] * pow(value, 2) + (*parameters)[1] * value + (*parameters)[2];
 }
 
 float Derivative_of_func(float value, std::shared_ptr<std::vector<float>> parameters)
 {
     // f(Z) = Z3 - CZ2 + DZ - E = 0
     // f'(Z) = 3Z2 - 2CZ + D = 0
-    return 3 * pow(value, 2) - 2 * (*parameters)[0] * value + (*parameters)[1];
+    return 3 * pow(value, 2) + 2 * (*parameters)[0] * value + (*parameters)[1];
 }
 
 void swap(float* a, float* b)
@@ -75,6 +77,11 @@ public:
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     float z, zl;
     float p, t;
+    bool use_trig_method;
+    float root_precision;
+    uint16_t max_root_find_iterations;
+    float xi_total_tolerance;
+    bool print_debug_data;
     db_class mydbclass;
 
 // public member funcs
@@ -88,8 +95,8 @@ public:
 
 pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_phi) : mydbclass(db_n)
 {
-    p = pressure*0.1 - 0.101325;
-    // p = 0.000001 * (pressure*100000 - 101325);
+    // p = pressure*0.1 - 0.101325;
+    p = pressure*0.1;
     t = temperature + 273.15;
     // mydbclass = new db_class(db_n);
     cal_phi = Calc_phi;
@@ -127,23 +134,35 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_ph
             phi_L_ptr->resize(size_of_gas_data);
         }
     }
-    std::cout<<"PR class constructor called and finished \n\n";
+    if(print_debug_data)
+        std::cout<<"PR class constructor called and finished \n\n";
+
+    use_trig_method = false;
+    root_precision = 1e-05;
+    max_root_find_iterations = 50;
+    xi_total_tolerance = 1e-06;
+    print_debug_data = false;
 }
 
 pr_eos::~pr_eos()
 {
     delete[] xi_not_norm;
-    std::cout<<"\n\nPR_EOS destructor has been called\n\n";
+    if(print_debug_data)
+        std::cout<<"\n\nPR_EOS destructor has been called\n\n";
 }
 
 // print funcs
 void pr_eos::print_base_data()
 {
     std::cout<<"\n\n";
-    if(base_data_pt){
-        std::cout<<"\n"<<"Tc"<<"\t"<<"Pc"<<"\t"<<"Acc factor"<<"\t"<<"Yi"<<"\t"<<"Xi"<<"\t"<<"Tsat"<<"\n";
+    if(base_data_pt)
+    {
+        std::cout<< std::left << std::setw(8) <<"Tc"<< std::left << std::setw(15) <<"Pc"<< std::left << std::setw(15) <<"Acc factor"
+                 << std::left << std::setw(5) <<"Yi"<< std::left << std::setw(15) <<"Xi"<< std::left << std::setw(8) <<"Tsat"<<std::endl;
+
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) 
-            std::cout<<"\n"<<i->tc<<"\t"<<i->pc<<"\t"<<i->w<<"\t"<<i->yi<<"\t"<<i->xi<<"\t"<<i->tsat<<"\n";
+            std::cout<< std::left << std::setw(8) <<i->tc<< std::left << std::setw(15) <<i->pc<< std::left << std::setw(15) <<i->w
+                     << std::left << std::setw(5) <<i->yi<< std::left << std::setw(15) <<i->xi<< std::left << std::setw(8) <<i->tsat<<std::endl;
     }
     else
         std::cout<<"\nenakune varuveengala da\n";
@@ -198,8 +217,6 @@ void pr_eos::PR_consts_Calc(base_props* gas_prop, PR_props* prprops)
 
 
 //all other shenanigans here
-
-// new WTF
 void pr_eos::pr_single_gas_props()
 {
     PR_props* ans = new PR_props;
@@ -213,16 +230,17 @@ void pr_eos::pr_single_gas_props()
     bb = b * p / (r * t);          // B constant for Z-equation
     
     delete ans;
-
+    
+    // DEBUG code
     // float c,d,e;
     // c = (1 - bb);
     // d = (aa - 2 * bb - 3 * pow(bb, 2));
     // e = (aa * bb - pow(bb, 2) - pow(bb, 3));
     // printf("\n\nC : %f\nD : %f\nE : %f\n\n",c,d,e);
 
-    parameters[0] = ((1 - bb));
+    parameters[0] = ((bb - 1));
     parameters[1] = ((aa - 2 * bb - 3 * pow(bb, 2)));
-    parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
+    parameters[2] = ((-1 * aa * bb + pow(bb, 2) + pow(bb, 3)));
 }
 
 void pr_eos::pr_mix_props()
@@ -237,7 +255,6 @@ void pr_eos::pr_mix_props()
     if(base_data_pt)
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
             PR_consts_Calc(&(*i), ans);
-            // pr_mix_data.push_back(*ans);
             pr_mix_data.at(k) = *ans;
             k++;
         }
@@ -294,17 +311,18 @@ void pr_eos::pr_mix_props()
     aa = a * p / (r * r * t * t);  // A constant for Z-equation
     bb = b * p / (r * t);          // B constant for Z-equation
 
+    // DEBUG code
     // float c,d,e;
     // c = (1 - bb);
     // d = (aa - 2 * bb - 3 * pow(bb, 2));
     // e = (aa * bb - pow(bb, 2) - pow(bb, 3));
     // printf("\n\nC : %f\nD : %f\nE : %f\n\n",c,d,e);
 
-    parameters[0] = ((1 - bb));
+    parameters[0] = ((bb - 1));
     parameters[1] = ((aa - 2 * bb - 3 * pow(bb, 2)));
-    parameters[2] = ((aa * bb - pow(bb, 2) - pow(bb, 3)));
+    parameters[2] = ((-1 * aa * bb + pow(bb, 2) + pow(bb, 3)));
 }
-// --------------------------------
+
 void pr_eos::getZ()
 {
     if(Is_mix)
@@ -320,8 +338,12 @@ void pr_eos::getZ()
     float (*funcd)(float, std::shared_ptr<std::vector<float>>) = Derivative_of_func;
 
     // Print Parameters DEBUG
-    // for(const auto& i : parameters)
-        // std::cout<<"\n"<<i;
+    if(print_debug_data){
+        std::cout<<"C2 \t C1 \t C0\n";
+        for(const auto& i : parameters)
+            std::cout<<i<<"\t";
+    }
+    
 
     // before solving anything lets find whether the equation has one or 3 real toots
     float Q1 = parameters[0]*parameters[1]/6 - parameters[2]/2 - pow(parameters[0],3)/27;
@@ -330,32 +352,60 @@ void pr_eos::getZ()
 
     if (D>=0){
         no_of_root = 1;
-        std::cout<<"\nonly one real root so going for newton raphson way\n";
+
+        if(use_trig_method)
+        {
+            // proposed way to find root in literature;
+            if(print_debug_data)
+                std::cout<<"\nUsing trig method\n";
+            z = pow((Q1 + sqrt(D)),1/3) + pow((Q1 - sqrt(D)),1/3) - parameters[0]/3;
+        }
+
+        else{
+            if(print_debug_data)
+                std::cout<<"\nonly one real root so going for newton raphson way\n";
+
         float f = 1;
-        if(newton_raphson_controlled(&f,fun,funcd,ptr,0.0001,50))
+        if(newton_raphson_controlled(&f,fun,funcd,ptr,root_precision,max_root_find_iterations))
             z = f;
-        std::cout<<"\nans : "<<z;
+
+            if(print_debug_data)
+                std::cout<<"\nans : "<<z;
+        }
     }
     else{
         no_of_root = 3;
-        std::cout<<"\nhas three roots - weistrass\n";
+        if(print_debug_data)
+            std::cout<<"\nhas three roots - weistrass\n";
+        
+        if(use_trig_method)
+        {
+            // proposed way to find root in literature;
+            if(print_debug_data)
+                std::cout<<"\nUsing trig method\n";
+            // proposed way to find root in literature;
+            float t1 = Q1*Q1 / (P1*P1*P1);
+            float t2 = sqrt(1 - t1) / sqrt(t1) * Q1 / abs(Q1);
+            float theta = atan(t2);
+            if(theta<0)
+                theta = theta + M_PI;
+            
+            ini_p->at(0) = 2*sqrt(P1) *  cos(theta / 3) - parameters[0]/3;
+            ini_p->at(1) = 2*sqrt(P1) * cos((theta + 2*M_PI)/3) - parameters[0]/3;
+            ini_p->at(2) = 2*sqrt(P1) * cos((theta + 4*M_PI)/3) - parameters[0]/3;
+        }
 
-        // std::vector<float> ini;
-        // ini.reserve(3);
-
-        // ini.push_back(0);
-        // ini.push_back(0.5);
-        // ini.push_back(1);
-
-        // std::shared_ptr<std::vector<float>> ini_p = std::make_shared<std::vector<float>>(ini);
-
+        else{
         ini_p->at(0) = 0; 
         ini_p->at(1) = 0.5; 
         ini_p->at(2) = 1; 
 
         // for weistrass initial guess is VERY VERY IMPORTANT -------
-        if(weistrass_controlled(ini_p, fun, ptr, 0.001, 50)){
-            std::cout<<"\nweistrass suceeded\n";
+        if(weistrass_controlled(ini_p, fun, ptr, root_precision, max_root_find_iterations))
+            if(print_debug_data)
+                std::cout<<"\nweistrass suceeded\n";
+
+        }
             // alternative to qsort cause only 3 no.s
             if ((*ini_p)[0] > (*ini_p)[2])
                 swap(&(*ini_p)[0], &(*ini_p)[2]);
@@ -368,8 +418,9 @@ void pr_eos::getZ()
             // -----------------------------------------
             z = (*ini_p)[2];
             zl = (*ini_p)[0];
-        }
-        std::cout<<"\nans : "<<z<<"\t"<<zl;
+        
+        if(print_debug_data)
+            std::cout<<"\nans : "<<z<<"\t"<<zl;
         
     }
 }
@@ -396,25 +447,27 @@ void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
 float pr_eos::dew_pt_calc(bool is_first_time)
 {
 
-    // calculate Phi_Y since anyway
+    // calculate Phi_Y since anyway this doesnot going to change
     std::fill(phi_V_ptr->begin(), phi_V_ptr->end(), 1);
     calc_phi(z, phi_V_ptr);
 
     // report Phi_Y values
-    printf("\n Phi vapour values \n");
-    for(const auto i : *phi_V_ptr)
-        std::cout<<i<<"\n";
+    if(print_debug_data){
+        printf("\n \n Phi vapour values \n\n");
+        for(const auto i : *phi_V_ptr)
+            std::cout<<i<<"\n";
+        printf("\n\n ----------------------------------- \n\n");
+    }
     
     uint16_t j = 0;
     float xi_total = 0;
-    // for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
     for (const auto& i : *base_data_pt){
         xi_not_norm[j] = i.yi / exp(log((i.pc * 0.000001) / p) + (5.37269855031944 * (1 + i.w) * (1 - (i.tc / t))));
         xi_total = xi_total + xi_not_norm[j];
         j++;
     }
 
-    // find xi_initial
+    // estimated temperature and return / stop the func here itself
     j=0;
     if(is_first_time){
         estimated_temp = 0;
@@ -426,7 +479,7 @@ float pr_eos::dew_pt_calc(bool is_first_time)
         return 0;
     }
 
-
+    // find xi_initial
     for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
         i->xi = (xi_not_norm[j] / xi_total);
         j++;
@@ -436,7 +489,7 @@ float pr_eos::dew_pt_calc(bool is_first_time)
     // find the phi l
     std::fill(phi_L_ptr->begin(), phi_L_ptr->end(), 1);
 
-    float xi_total_tolerance = 1e-06, xi_total_new = 0;
+    float xi_total_new = 0;
     xi_total = 0;
     // loop to refine xi
     for (uint32_t i = 0; i < 20; i++){
@@ -450,11 +503,18 @@ float pr_eos::dew_pt_calc(bool is_first_time)
 
         calc_phi(zl,phi_L_ptr);
 
-        printf("\n Phi liquid values at %dth iteration \n", i);
-        for(const auto i : *phi_L_ptr)
-            std::cout<<i<<"\n";
+        if(print_debug_data){
+        //print result
+        j = 0;
+        printf("\nvalues at %dth iteration \n", i);
+        std::cout << std::left << std::setw(20) << "Phi_L" << std::left << std::setw(20) << "Xi_norm" << std::left << std::setw(20) << "Xi" << std::endl;
+        for(const auto& i : *base_data_pt){
+            std::cout << std::left << std::setw(20) << phi_L_ptr->at(j) << std::left << std::setw(20) << i.xi << std::left << std::setw(20) << xi_not_norm[j] << std::endl;
+            j++;
+        }
+        }
 
-        // update xi using the yi, phi_v and phi_l
+        // update xi using the yi, phi_v and phi_l and 
         j=0; xi_total_new=0;
         for(auto& i : *base_data_pt){
             xi_not_norm[j] = i.yi * (phi_V_ptr->at(j) / phi_L_ptr->at(j));
@@ -462,6 +522,7 @@ float pr_eos::dew_pt_calc(bool is_first_time)
             j++;
         }
 
+        // loop to normalize and write values to base_Data -> Xi
         j = 0;
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
             i->xi = xi_not_norm[j] / xi_total_new;
@@ -471,9 +532,6 @@ float pr_eos::dew_pt_calc(bool is_first_time)
 
         if(abs(xi_total_new - xi_total) <= xi_total_tolerance)
             break;
-        
-        printf("\nvalues at %dth iteration \n", i);
-        print_base_data();
         
         xi_total = xi_total_new;
 
@@ -488,32 +546,27 @@ void pr_eos::calc_dew()
 
     getZ();
     dew_pt_calc(true);
-    printf("\n\nestimated temp is %f\n\n",estimated_temp);
+    printf("\n\n Estimated dewpt temperature is %f Deg C\n",estimated_temp-273.15);
 
     t1 = estimated_temp - 25.0;
     t2 = estimated_temp + 25.0;
     
     //secant
-    uint16_t iters = 25;
-    float tn = 0, ft, ftt, tolerance=1e-06;
-    for (uint16_t i = 0; i < iters; i++)
-    {
+    float tn = 0, ft, ftt;
+    uint16_t i;
+    for (i = 0; i < max_root_find_iterations; i++){
         t = t1;
         ft = dew_pt_calc(false);
         t = t2;
         ftt = dew_pt_calc(false);
         float temp = (ft - ftt);
-        if (abs(temp) <= tolerance)
-        {
-            std::cout << "\n\nomale converged at "<<i<<" na idhukku mela pova maaten \n\n";
+        if (abs(temp) <= root_precision)
             break;
-        }
+
         tn = t1 - ft * ((t1 - t2) / (ft - ftt));
 
         t1 = t2;
         t2 = tn;
-        
-        std::cout << "\n\nat the end of every secant loop --> " << tn << "\n\n";
     }
-    std::cout<<"\n\n tempe is : "<<tn-273.15<<"\n\n";
+    printf("\n\n Dew pt temperature is (converged at %d steps): %f  Deg C\n\n",i,tn-273.15);
 }
