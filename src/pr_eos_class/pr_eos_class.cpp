@@ -79,7 +79,7 @@ public:
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     float z, zl;
     float p, t;
-    float cp, cv;
+    float cp, cv, cp_ig, cv_ig, cp_r, cv_r;
     //config
     bool use_trig_method                = false;
     float root_precision                = 1e-05;
@@ -616,7 +616,7 @@ void pr_eos::calc_cp()
     std::unique_ptr<std::vector<CP_Const>> cp_const = mydbclass.get_cp_const_pointer();
     // CpIG = A + B.T + C.T² + D.T³
     // float* cp_R = new float[size_of_gas_data];
-    float cp_ig = 0; // gives the Cp in CAL/G-MOLE-K
+    cp_ig = 0; // gives the Cp in CAL/G-MOLE-K
     uint16_t j = 0;
     for(const auto& i : *base_data_pt)
         cp_ig = cp_ig +  i.yi*(cp_const->at(j).A + t_reserve*cp_const->at(j).B 
@@ -624,51 +624,64 @@ void pr_eos::calc_cp()
                                 + t_reserve*t_reserve*t_reserve*cp_const->at(j).D);
 
     cp_ig = 4.1868 * cp_ig; // converted to J / mol . K
-    float cv_ig = cp_ig - r;
-    printf("\n\ncp : %f   cv : %f\n\n",cp_ig, cv_ig);
+    cv_ig = cp_ig - r;
+    // printf("\n\ncp : %f   cv : %f\n\n",cp_ig, cv_ig);
     // now the struggle starts
-    float cp_r = 0, cv_r = 0;
+    cp_r = 0; cv_r = 0;
     j=0;
-    p = p * 1000000; //change to pascals
-    float v = ((z * r * t) / p) * 1e+06;
-    std::cout<<"\n\n Volume is --> "<<v<<"\n";
+    float v = ((z * r * t) / p);
+    float dPdVatT = 0, dadTatV = 0, dPdTatV = 0, dTdPatV = 0, daadTatP= 0, 
+          dbbdTatP= 0, aai     = 0, bbi     = 0, Num     = 0, Denom   = 0, dZdTatP = 0, 
+          dVdTatP = 0, aDoubleD= 0, Cvr     = 0, Cpr     = 0, aDoubleDash = 0;
+    // std::cout<<"\n\n Volume is --> "<<v<<"\n";
     for(const auto& i : pr_mix_data)
     {
         // step 1
-        float dPdVatT = ((-r * t) / ((v - i.b) * (v - i.b))) + 2 * i.a * (v + i.b) / ((v * (v + i.b) + i.b * (v - i.b)) * (v * (v + i.b) + i.b * (v - i.b)));
+        dPdVatT = ((-r * t) / ((v - i.b) * (v - i.b))) + 2 * i.a * (v + i.b) / ((v * (v + i.b) + i.b * (v - i.b)) * (v * (v + i.b) + i.b * (v - i.b)));
         
-        // step 2
+        //report
+        /**
         std::cout<<"PR props :\n"
-                 <<"a : "
+                 <<"P : "
+                 <<p
+                 <<"\nt : "
+                 <<t
+                 <<"\na : "
                  <<i.a
                  <<"\nb : "
                  <<i.b
                  <<"\nm : "
                  <<i.k
                  <<"\n\n";
-        float dadTatV = -i.k * i.ac / (sqrt(t * base_data_pt->at(j).tc) * (1 + i.k * (1 - sqrt(t / base_data_pt->at(j).tc))));
-        float dPdTatV = r / (v - i.b) - dadTatV / (v * (v + i.b) + i.b * (v - i.b));
-        float dTdPatV = 1 / dPdTatV;
+        **/
+        // step 2
+        dadTatV = -i.k * i.ac / (sqrt(t * base_data_pt->at(j).tc) * (1 + i.k * (1 - sqrt(t / base_data_pt->at(j).tc))));
+        dPdTatV = r / (v - i.b) - dadTatV / (v * (v + i.b) + i.b * (v - i.b));
+        dTdPatV = 1 / dPdTatV;
 
         // step 3 
-        float daadTatP = (p / (r * r * t_reserve * t_reserve)) * (dadTatV - 2 * i.a / t_reserve);
-        float dbbdTatP = -b * p / (r * t_reserve * t_reserve);
+        daadTatP = (p / (r * r * t_reserve * t_reserve)) * (dadTatV - 2 * i.a / t_reserve);
+        dbbdTatP = -i.b * p / (r * t_reserve * t_reserve);
 
-        float Num = daadTatP * (bb - z) + dbbdTatP * (6 * bb * z + 2 * z - 3 * bb * bb - 2 * bb + aa - z * z);
-        float Denom = 3 * z * z + 2 * (bb - 1) * z + (aa - 2 * bb - 3 * bb * bb);
+        aai = i.a * p / (r * r * t * t);  // A constant for Z-equation
+        bbi = i.b * p / (r * t);          // B constant for Z-equation
 
-        float dZdTatP = Num / Denom;
+        Num = daadTatP * (bbi - z) + dbbdTatP * (6 * bbi * z + 2 * z - 3 * bbi * bbi - 2 * bbi + aai - z * z);
+        Denom = 3 * z * z + 2 * (bbi - 1) * z + (aai - 2 * bbi - 3 * bbi * bbi);
 
-        float dVdTatP = (r / p) * (t_reserve * dZdTatP + z);
+        dZdTatP = Num / Denom;
+
+        dVdTatP = (r / p) * (t_reserve * dZdTatP + z);
 
 
 
         // last step to success
-        float aDoubleDash = i.ac * i.k * (1 + i.k) * sqrt(base_data_pt->at(j).tc / t_reserve) / (2 * t_reserve * base_data_pt->at(j).tc);
-        float Cvr = (t_reserve * aDoubleDash / (i.b * sqrt(8))) * log((z + bb * (1 + sqrt(2))) / (z + bb * (1 - sqrt(2))));
-        float Cpr = Cvr + t_reserve * dPdTatV * dVdTatP - r;
+        aDoubleDash = i.ac * i.k * (1 + i.k) * sqrt(base_data_pt->at(j).tc / t_reserve) / (2 * t_reserve * base_data_pt->at(j).tc);
+        Cvr = ( (t_reserve * aDoubleDash / (i.b * sqrt(8))) * log((z + bbi * (1 + sqrt(2))) / (z + bbi * (1 - sqrt(2)))) );
+        Cpr = Cvr + t_reserve * dPdTatV * dVdTatP - r;
         
         // report
+        /**
         std::cout<<"dPdVatT : "
                  <<dPdVatT
                  <<"\ndPdTatV : "
@@ -690,22 +703,30 @@ void pr_eos::calc_cp()
                  <<"\nCpr : "
                  <<Cpr
                  <<"\n\n\n";
+        **/
         // atlast
-        cp_r = cp_r + base_data_pt->at(j).xi*Cpr;
-        cv_r = cv_r + base_data_pt->at(j).xi*Cvr;
+        cp_r = cp_r + base_data_pt->at(j).yi*Cpr;
+        cv_r = cv_r + base_data_pt->at(j).yi*Cvr;
         j++;
     }
 
     cp = cp_r + cp_ig;
     cv = cv_r + cv_ig;
-    printf("\n\ncpR : %f   cvR : %f\n\n",cp_r, cv_r);
+    // printf("\n\ncpR : %f   cvR : %f\n\n",cp_r, cv_r);
 
 }
 
 void pr_eos::get_cp(bool print_val)
 {
     calc_cp();
-    if(print_val)
-        std::cout<<"\n\ncp value is "<<cp<<"\n\n";
-        std::cout<<"\n\ncv value is "<<cv<<"\n\n";
+    if(print_val){
+        std::cout<<"\ncp value is "<<cp<<"\n";
+        std::cout<<"\ncv value is "<<cv<<"\n";
+        std::cout<<"\ncpR value is "<<cp_r<<"\n";
+        std::cout<<"\ncvR value is "<<cv_r<<"\n";
+        std::cout<<"\ncpIG value is "<<cp_ig<<"\n";
+        std::cout<<"\ncvIG value is "<<cv_ig<<"\n";
+        std::cout<<"\nlambda value for real gas is "<<cp/cv<<"\n";
+        std::cout<<"\nlambda value for ideal gas is "<<cp_ig/cv_ig<<"\n\n";
+    }
 }
