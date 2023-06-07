@@ -1,6 +1,7 @@
 #include "db_class.h"
 #include "pr_eos_class.h"
 #include <iostream>
+#include <limits>
 void testDB()
 {
     db_class mydbclass("props.db");
@@ -39,20 +40,21 @@ void testDB()
 
 void testPRclass()
 {
-    // float p, t;
-    // std::cout<<"Enter Pressure in bar : ";
-    // std::cin>>p;
-    // std::cout<<"Enter temperature in celcius : ";
-    // std::cin>>t;
+    float p, t;
+    std::cout<<"Enter Pressure in barA : ";
+    std::cin>>p;
+    std::cout<<"Enter temperature in celcius : ";
+    std::cin>>t;
+    printf("\nPressure : %f \t Temperature : %f\n\n",p,t);
 
-    pr_eos eos(5, 40, "props.db", true);
+    pr_eos eos(p, t, "props.db", true);
     // eos.set_print_debug_data(true);
     // eos.print_bip_data();
-    eos.getZ();
+    // eos.getZ(true);
+    eos.get_cp(true);
     // eos.calc_dew();
     eos.print_base_data();
-
-
+    
 }
 
 int main()
@@ -60,6 +62,7 @@ int main()
     std::cout<<"\n I'm from main\n\n";
     // testDB();
     testPRclass();
+
     std::cout<<"\n\nEnd of main\n\n";
     return 0;
 }

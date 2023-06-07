@@ -27,7 +27,6 @@ private:
     sqlite3 *db;
 
     std::map<unsigned int, std::string> all_gas_names_map;
-    std::string gas_choices;
 
     std::string querry;
     bool Is_database_open = false;
@@ -62,7 +61,8 @@ public:
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-    virtual ~db_class();
+    // virtual ~db_class();
+    ~db_class();
 
 };
 
@@ -146,8 +146,9 @@ unsigned int db_class::choose_gas_from_user()
     for(const auto& i : all_gas_names_map)
         std::cout<<"\n"<<i.first<<". "<<i.second;
     
+    std::string gas_choices;
     std::cout<<"\n\nYour choices : ";
-    std::getline(std::cin, gas_choices);
+    std::getline(std::cin>>std::ws, gas_choices);
     
     // clean the input from user
     // clean the string directly comparing with ACSII values

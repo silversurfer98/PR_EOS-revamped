@@ -41,7 +41,7 @@ void swap(float* a, float* b)
 
 
 class pr_eos
-{
+{ 
 private:
 // private variable
     std::vector<PR_props> pr_mix_data;
@@ -59,6 +59,7 @@ private:
     float estimated_temp = 0;
     float *xi_not_norm;
     bool should_I_use_yi = true;
+    float t_reserve;
 
     std::shared_ptr<std::vector<float>> ini_p;
 
@@ -70,6 +71,7 @@ private:
     void pr_single_gas_props();
     void calc_phi(float z, std::unique_ptr<std::vector<float>>& phi);
     float dew_pt_calc(bool is_first_time);
+    void calc_cp();
 
 
 public:
@@ -77,6 +79,7 @@ public:
     std::unique_ptr<std::vector<base_props>> base_data_pt;
     float z, zl;
     float p, t;
+    float cp, cv;
     //config
     bool use_trig_method                = false;
     float root_precision                = 1e-05;
@@ -90,8 +93,9 @@ public:
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
-    void getZ();
+    void getZ(bool print_z);
     void calc_dew();
+    void get_cp(bool print_val);
 
     //config
     void set_use_trig_method(bool use_trig_method_f);
@@ -101,14 +105,16 @@ public:
     void set_xi_total_tolerance(float xi_total_tolerance_f);
 };
 
-pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_phi) : mydbclass(db_n)
+pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_phi) : mydbclass{db_n}
 {
     // p = pressure*0.1 - 0.101325;
     p = pressure*0.1;
     t = temperature + 273.15;
-    // mydbclass = new db_class(db_n);
+    t_reserve = t;
+
     cal_phi = Calc_phi;
     z = 1; zl = 0;
+
     parameters.reserve(3);
     for(uint16_t i = 0;i<3;i++)
         parameters.push_back(1.0);
@@ -353,7 +359,7 @@ void pr_eos::pr_mix_props()
     parameters[2] = ((-1 * aa * bb + pow(bb, 2) + pow(bb, 3)));
 }
 
-void pr_eos::getZ()
+void pr_eos::getZ(bool print_z)
 {
     if(Is_mix)
         pr_mix_props();
@@ -453,7 +459,8 @@ void pr_eos::getZ()
             std::cout<<"\nans : "<<z<<"\t"<<zl;
         
     }
-    std::cout<<"\nCompressibility factors are : "<<z<<"\t"<<zl<<"\n";
+    if(print_z)
+        std::cout<<"\nCompressibility factors are : "<<z<<"\t"<<zl<<"\n";
 }
 // ------------------------------- dew pt calc --------------------
 void pr_eos::calc_phi(float Z, std::unique_ptr<std::vector<float>>& phi)
@@ -528,21 +535,21 @@ float pr_eos::dew_pt_calc(bool is_first_time)
         should_I_use_yi = false;
         // pr_mix_data.clear();
         zl=0;
-        getZ();
+        getZ(false);
         if(zl<=0)
             break;
 
         calc_phi(zl,phi_L_ptr);
 
         if(print_debug_data){
-        //print result
-        j = 0;
-        printf("\nvalues at %dth iteration \n", i);
-        std::cout << std::left << std::setw(20) << "Phi_L" << std::left << std::setw(20) << "Xi_norm" << std::left << std::setw(20) << "Xi" << std::endl;
-        for(const auto& i : *base_data_pt){
-            std::cout << std::left << std::setw(20) << phi_L_ptr->at(j) << std::left << std::setw(20) << i.xi << std::left << std::setw(20) << xi_not_norm[j] << std::endl;
-            j++;
-        }
+            //print result
+            j = 0;
+            printf("\nvalues at %dth iteration \n", i);
+            std::cout << std::left << std::setw(20) << "Phi_L" << std::left << std::setw(20) << "Xi_norm" << std::left << std::setw(20) << "Xi" << std::endl;
+            for(const auto& i : *base_data_pt){
+                std::cout << std::left << std::setw(20) << phi_L_ptr->at(j) << std::left << std::setw(20) << i.xi << std::left << std::setw(20) << xi_not_norm[j] << std::endl;
+                j++;
+            }
         }
 
         // update xi using the yi, phi_v and phi_l and 
@@ -575,7 +582,7 @@ void pr_eos::calc_dew()
 {
     float t2 = 0, t1 = 0, fx = 0, tnew = 0;
 
-    getZ();
+    getZ(false);
     dew_pt_calc(true);
     printf("\n\n Estimated dewpt temperature is %f Deg C\n",estimated_temp-273.15);
 
@@ -600,4 +607,105 @@ void pr_eos::calc_dew()
         t2 = tn;
     }
     printf("\n\n Dew pt temperature is (converged at %d steps): %f  Deg C\n\n",i,tn-273.15);
+}
+
+void pr_eos::calc_cp()
+{
+    getZ(true);
+    //cp const data
+    std::unique_ptr<std::vector<CP_Const>> cp_const = mydbclass.get_cp_const_pointer();
+    // CpIG = A + B.T + C.T² + D.T³
+    // float* cp_R = new float[size_of_gas_data];
+    float cp_ig = 0; // gives the Cp in CAL/G-MOLE-K
+    uint16_t j = 0;
+    for(const auto& i : *base_data_pt)
+        cp_ig = cp_ig +  i.yi*(cp_const->at(j).A + t_reserve*cp_const->at(j).B 
+                                + t_reserve*t_reserve*cp_const->at(j).C
+                                + t_reserve*t_reserve*t_reserve*cp_const->at(j).D);
+
+    cp_ig = 4.1868 * cp_ig; // converted to J / mol . K
+    float cv_ig = cp_ig - r;
+    printf("\n\ncp : %f   cv : %f\n\n",cp_ig, cv_ig);
+    // now the struggle starts
+    float cp_r = 0, cv_r = 0;
+    j=0;
+    p = p * 1000000; //change to pascals
+    float v = ((z * r * t) / p) * 1e+06;
+    std::cout<<"\n\n Volume is --> "<<v<<"\n";
+    for(const auto& i : pr_mix_data)
+    {
+        // step 1
+        float dPdVatT = ((-r * t) / ((v - i.b) * (v - i.b))) + 2 * i.a * (v + i.b) / ((v * (v + i.b) + i.b * (v - i.b)) * (v * (v + i.b) + i.b * (v - i.b)));
+        
+        // step 2
+        std::cout<<"PR props :\n"
+                 <<"a : "
+                 <<i.a
+                 <<"\nb : "
+                 <<i.b
+                 <<"\nm : "
+                 <<i.k
+                 <<"\n\n";
+        float dadTatV = -i.k * i.ac / (sqrt(t * base_data_pt->at(j).tc) * (1 + i.k * (1 - sqrt(t / base_data_pt->at(j).tc))));
+        float dPdTatV = r / (v - i.b) - dadTatV / (v * (v + i.b) + i.b * (v - i.b));
+        float dTdPatV = 1 / dPdTatV;
+
+        // step 3 
+        float daadTatP = (p / (r * r * t_reserve * t_reserve)) * (dadTatV - 2 * i.a / t_reserve);
+        float dbbdTatP = -b * p / (r * t_reserve * t_reserve);
+
+        float Num = daadTatP * (bb - z) + dbbdTatP * (6 * bb * z + 2 * z - 3 * bb * bb - 2 * bb + aa - z * z);
+        float Denom = 3 * z * z + 2 * (bb - 1) * z + (aa - 2 * bb - 3 * bb * bb);
+
+        float dZdTatP = Num / Denom;
+
+        float dVdTatP = (r / p) * (t_reserve * dZdTatP + z);
+
+
+
+        // last step to success
+        float aDoubleDash = i.ac * i.k * (1 + i.k) * sqrt(base_data_pt->at(j).tc / t_reserve) / (2 * t_reserve * base_data_pt->at(j).tc);
+        float Cvr = (t_reserve * aDoubleDash / (i.b * sqrt(8))) * log((z + bb * (1 + sqrt(2))) / (z + bb * (1 - sqrt(2))));
+        float Cpr = Cvr + t_reserve * dPdTatV * dVdTatP - r;
+        
+        // report
+        std::cout<<"dPdVatT : "
+                 <<dPdVatT
+                 <<"\ndPdTatV : "
+                 <<dPdTatV
+                 <<"\ndTdPatV : "
+                 <<dTdPatV
+                 <<"\ndaadTatP: "
+                 <<daadTatP
+                 <<"\ndbbdTatP : "
+                 <<dbbdTatP
+                 <<"\ndZdTatP : "
+                 <<dZdTatP
+                 <<"\ndVdTatP : "
+                 <<dVdTatP
+                 <<"\naDoubleDash : "
+                 <<aDoubleDash
+                 <<"\nCvr : "
+                 <<Cvr
+                 <<"\nCpr : "
+                 <<Cpr
+                 <<"\n\n\n";
+        // atlast
+        cp_r = cp_r + base_data_pt->at(j).xi*Cpr;
+        cv_r = cv_r + base_data_pt->at(j).xi*Cvr;
+        j++;
+    }
+
+    cp = cp_r + cp_ig;
+    cv = cv_r + cv_ig;
+    printf("\n\ncpR : %f   cvR : %f\n\n",cp_r, cv_r);
+
+}
+
+void pr_eos::get_cp(bool print_val)
+{
+    calc_cp();
+    if(print_val)
+        std::cout<<"\n\ncp value is "<<cp<<"\n\n";
+        std::cout<<"\n\ncv value is "<<cv<<"\n\n";
 }

@@ -29,7 +29,8 @@ public:
     std::unique_ptr<std::vector<std::vector<float>>> get_bip_pointer();
     std::unique_ptr<std::vector<CP_Const>> get_cp_const_pointer();
     std::unique_ptr<std::vector<base_props>> get_base_gas_props_ptr();
-    virtual ~db_class();
+    // virtual ~db_class();
+    ~db_class();
     unsigned int get_no_of_gases();
 
 };
