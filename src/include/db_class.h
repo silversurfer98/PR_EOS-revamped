@@ -23,6 +23,7 @@ public:
     // unsigned int size_of_gas_data;
 
 //class members
+    db_class() = default;
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
     unsigned int choose_gas_from_user();

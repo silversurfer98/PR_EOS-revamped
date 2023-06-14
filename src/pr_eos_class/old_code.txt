@@ -1,66 +1,95 @@
-void pr_eos::calc_cp()
+pr_eos::pr_eos(float pressure, float temperature, bool Calc_phi)
 {
-    getZ();
-    //cp const data
-    // std::unique_ptr<std::vector<CP_Const>> cp_const = mydbclass.get_cp_const_pointer();
-    // CpIG = A + B.T + C.T² + D.T³
-    // float* cp_R = new float[size_of_gas_data];
-    float cp_ig = 0; // gives the Cp in CAL/G-MOLE-K
+    p = pressure*0.1;
+    t = temperature + 273.15;
+    t_reserve = t;
+
+    cal_phi = Calc_phi;
+    z = 1; zl = 0;
+
+    parameters.reserve(3);
+    for(uint16_t i = 0;i<3;i++)
+        parameters.push_back(1.0);
+    
+    std::cout<<"How many gases are u gonna create : ";
+    std::cin>>size_of_gas_data;
+
+    if(size_of_gas_data == 1)
+        Is_mix = false;
+
+    std::cout<<"\n\n Enter base gas data : \n\n";
+    base_data_pt = std::make_unique<std::vector<base_props>>();
+    base_data_pt->resize(size_of_gas_data);
+
     uint16_t j = 0;
-    for(const auto& i : *base_data_pt)
-        cp_ig = cp_ig +  i.yi*(cp_const->at(j).A + t_reserve*cp_const->at(j).B 
-                                + t_reserve*t_reserve*cp_const->at(j).C
-                                + t_reserve*t_reserve*t_reserve*cp_const->at(j).D);
-
-    cp_ig = 4.1868 * cp_ig; // converted to J / mol . K
-    float cv_ig = cp_ig - r;
-
-    // now the struggle starts
-    float cp_r = 0, cv_r = 0;
-    j=0;
-    p = p * 1000000; //change to pascals
-    float v = ((z * r * t) / p);
-    for(const auto& i : pr_mix_data)
-    {
-        // step 1
-        float dPdVatT = ((-r * t) / ((v - i.b) * (v - i.b))) + 2 * i.a * (v + i.b) / ((v * (v + i.b) + i.b * (v - i.b)) * (v * (v + i.b) + i.b * (v - i.b)));
+    for(auto i : *base_data_pt){
+        std::cout<<"Enter base gas data for gas"<<j+1<<"\n";
+        // tc, pc, w, yi, xi, tsat
+        std::cout<<"Enter Tc [in K]= ";
+        std::cin>>i.tc;
         
-        // step 2
-        float dadTatV = -i.k * i.ac / (sqrt(t * base_data_pt->at(j).tc) * (1 + i.k * (1 - sqrt(t / base_data_pt->at(j).tc))));
-        float dPdTatV = r / (v - i.b) - dadTatV / (v * (v + i.b) + i.b * (v - i.b));
-        float dTdPatV = 1 / dPdTatV;
+        std::cout<<"Enter Pc [in Pa]= ";
+        std::cin>>i.pc;
 
-        // step 3 
-        float daadTatP = (p / (r * r * t_reserve * t_reserve)) * (dadTatV - 2 * i.a / t_reserve);
-        float dbbdTatP = -b * p / (r * t_reserve * t_reserve);
+        std::cout<<"Enter w = ";
+        std::cin>>i.w;
 
-        float Num = daadTatP * (bb - z) + dbbdTatP * (6 * bb * z + 2 * z - 3 * bb * bb - 2 * bb + aa - z * z);
-        float Denom = 3 * z * z + 2 * (bb - 1) * z + (aa - 2 * bb - 3 * bb * bb);
+        std::cout<<"Enter Yi= ";
+        std::cin>>i.yi;
 
-        float dZdTatP = Num / Denom;
-
-        float dVdTatP = (r / p) * (t_reserve * dZdTatP + z);
-
-
-
-        // last step to success
-        float aDoubleDash = i.ac * i.k * (1 + i.k) * sqrt(base_data_pt->at(j).tc / t_reserve) / (2 * t_reserve * base_data_pt->at(j).tc);
-        float Cvr = (t_reserve * aDoubleDash / (i.b * sqrt(8))) * log((z + bb * (1 + sqrt(2))) / (z + bb * (1 - sqrt(2))));
-        float Cpr = Cvr + t_reserve * dPdTatV * dVdTatP - r;
-        
-        // atlast
-        cp_r = cp_r + Cpr;
-        cv_r = cv_r + Cvr;
-        j++;
+        i.xi = 0;
+        i.tsat = 0;
     }
 
-    cp = cp_r + cp_ig;
-    cv = cv_r + cv_ig;
-}
+    // get bip data
+    if(Is_mix){
+        pr_mix_data.resize(size_of_gas_data);
 
-float pr_eos::get_cp()
-{
-    calc_cp();
-    std::cout<<"\n\ncp value is "<<cp<<"\n\n";
-    return cp;
+        // get that data
+        std::vector<std::vector<float>> bip_arr(size_of_gas_data , std::vector<float>(size_of_gas_data));
+        for(uint16_t i=0; i<size_of_gas_data; i++)
+        {
+            for(uint16_t j=0; j<size_of_gas_data; j++)
+            {
+                if(bip_arr[i][j]!=0)
+                    continue;
+                if(i==j)
+                {
+                    bip_arr[i][j] = 0;
+                    continue;
+                }
+                else
+                {
+                    std::cout<<"Enter the binary interaction parameter for gas"<<i+1<<" and gas"<<j+1<<" : ";
+                    std::cin>>bip_arr[i][j];
+                    bip_arr[j][i] = bip_arr[i][j];
+                }
+            }
+
+        }
+
+        bip_data_ptr = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
+
+
+        ini_p = std::make_shared<std::vector<float>>();
+        ini_p->resize(3);
+        if(cal_phi){
+            estimated_temp = 0.0;
+            xi_not_norm = new float[size_of_gas_data];
+
+            phi_V_ptr = std::make_unique<std::vector<float>>();
+            phi_V_ptr->resize(size_of_gas_data);
+
+            phi_L_ptr = std::make_unique<std::vector<float>>();
+            phi_L_ptr->resize(size_of_gas_data);
+        }
+    }
+    if(print_debug_data)
+        std::cout<<"PR class constructor called and finished \n\n";
+
+    use_trig_method = false;
+    root_precision = 1e-05;
+    max_root_find_iterations = 50;
+    xi_total_tolerance = 1e-06;
+    print_debug_data = false;
 }

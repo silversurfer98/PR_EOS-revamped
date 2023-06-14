@@ -72,6 +72,7 @@ private:
     void calc_phi(float z, std::unique_ptr<std::vector<float>>& phi);
     float dew_pt_calc(bool is_first_time);
     void calc_cp();
+    
 
 
 public:
@@ -89,7 +90,9 @@ public:
     db_class mydbclass;
 
 // public member funcs
+    pr_eos() { };
     pr_eos(float pressure, float temperature, const char* db_name, bool Calc_phi);
+    pr_eos(float pressure, float temperature, bool Calc_phi);
     ~pr_eos();
     void print_base_data();
     void print_bip_data();
@@ -157,6 +160,106 @@ pr_eos::pr_eos(float pressure, float temperature, const char* db_n, bool Calc_ph
     xi_total_tolerance = 1e-06;
     print_debug_data = false;
 }
+
+//overloaded constructor
+
+pr_eos::pr_eos(float pressure, float temperature, bool Calc_phi) //: mydbclass()
+{
+    p = pressure*0.1;
+    t = temperature + 273.15;
+    t_reserve = t;
+
+    cal_phi = Calc_phi;
+    z = 1; zl = 0;
+
+    parameters.reserve(3);
+    for(uint16_t i = 0;i<3;i++)
+        parameters.push_back(1.0);
+    
+    std::cout<<"How many gases are u gonna create : ";
+    std::cin>>size_of_gas_data;
+
+    if(size_of_gas_data == 1)
+        Is_mix = false;
+
+    std::cout<<"\n\n Enter base gas data : \n\n";
+    base_data_pt = std::make_unique<std::vector<base_props>>();
+    base_data_pt->resize(size_of_gas_data);
+
+    uint16_t j = 0;
+    for(auto i : *base_data_pt){
+        std::cout<<"Enter base gas data for gas"<<j+1<<"\n";
+        // tc, pc, w, yi, xi, tsat
+        std::cout<<"Enter Tc [in K]= ";
+        std::cin>>i.tc;
+        
+        std::cout<<"Enter Pc [in Pa]= ";
+        std::cin>>i.pc;
+
+        std::cout<<"Enter w = ";
+        std::cin>>i.w;
+
+        std::cout<<"Enter Yi= ";
+        std::cin>>i.yi;
+
+        i.xi = 0;
+        i.tsat = 0;
+    }
+
+    // get bip data
+    if(Is_mix){
+        pr_mix_data.resize(size_of_gas_data);
+
+        // get that data
+        std::vector<std::vector<float>> bip_arr(size_of_gas_data , std::vector<float>(size_of_gas_data));
+        for(uint16_t i=0; i<size_of_gas_data; i++)
+        {
+            for(uint16_t j=0; j<size_of_gas_data; j++)
+            {
+                if(bip_arr[i][j]!=0)
+                    continue;
+                if(i==j)
+                {
+                    bip_arr[i][j] = 0;
+                    continue;
+                }
+                else
+                {
+                    std::cout<<"Enter the binary interaction parameter for gas"<<i+1<<" and gas"<<j+1<<" : ";
+                    std::cin>>bip_arr[i][j];
+                    bip_arr[j][i] = bip_arr[i][j];
+                }
+            }
+
+        }
+
+        bip_data_ptr = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
+
+
+        ini_p = std::make_shared<std::vector<float>>();
+        ini_p->resize(3);
+        if(cal_phi){
+            estimated_temp = 0.0;
+            xi_not_norm = new float[size_of_gas_data];
+
+            phi_V_ptr = std::make_unique<std::vector<float>>();
+            phi_V_ptr->resize(size_of_gas_data);
+
+            phi_L_ptr = std::make_unique<std::vector<float>>();
+            phi_L_ptr->resize(size_of_gas_data);
+        }
+    }
+    if(print_debug_data)
+        std::cout<<"PR class overloaded constructor called and finished \n\n";
+
+    use_trig_method = false;
+    root_precision = 1e-05;
+    max_root_find_iterations = 50;
+    xi_total_tolerance = 1e-06;
+    print_debug_data = false;
+}
+
+//-----------------------------------------------------------------------------------------------------
 
 pr_eos::~pr_eos()
 {

@@ -54,6 +54,7 @@ public:
 // Public variables
 
 // Public class members
+    db_class() {};
     db_class(const char* custom_filename);
     unsigned int get_all_gas_names();
     unsigned int choose_gas_from_user();

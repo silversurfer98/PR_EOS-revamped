@@ -51,10 +51,48 @@ void testPRclass()
     // eos.set_print_debug_data(true);
     // eos.print_bip_data();
     // eos.getZ(true);
-    eos.get_cp(true);
-    // eos.calc_dew();
+    // eos.get_cp(true);
+    eos.calc_dew();
     eos.print_base_data();
     
+}
+
+void get_bip_test()
+{
+    // get that data
+    uint16_t size_of_gas_data = 3;
+    std::unique_ptr<std::vector<std::vector<float>>> bip_data_ptr;
+    std::vector<std::vector<float>> bip_arr(size_of_gas_data , std::vector<float>(size_of_gas_data));
+    for(uint16_t i=0; i<size_of_gas_data; i++)
+    {
+        for(uint16_t j=0; j<size_of_gas_data; j++)
+        {
+            if(bip_arr[i][j]!=0)
+                continue;
+            if(i==j)
+            {
+                bip_arr[i][j] = 0;
+                continue;
+            }
+            else
+            {
+                std::cout<<"Enter the binary interaction parameter for gas"<<i+1<<" and gas"<<j+1<<" : ";
+                std::cin>>bip_arr[i][j];
+                bip_arr[j][i] = bip_arr[i][j];
+            }
+        }
+
+    }
+
+    bip_data_ptr = std::make_unique<std::vector<std::vector<float>>>(bip_arr);
+
+    std::cout<<"\n binary interaction parameters \n";
+    if(bip_data_ptr!=nullptr){
+    for(auto row = bip_data_ptr->begin(); row != bip_data_ptr->end(); ++row){
+        for(auto col = row->begin(); col != row->end(); ++col)
+                std::cout<<*col<<"\t";
+            std::cout<<"\n";}}
+    std::cout<<"\n\n";
 }
 
 int main()
@@ -62,6 +100,7 @@ int main()
     std::cout<<"\n I'm from main\n\n";
     // testDB();
     testPRclass();
+    // get_bip_test();
 
     std::cout<<"\n\nEnd of main\n\n";
     return 0;
