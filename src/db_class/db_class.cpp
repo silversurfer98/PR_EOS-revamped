@@ -84,7 +84,7 @@ db_class:: db_class(const char* custom_filename)
 
 db_class:: ~db_class()
 {
-    std::cout<<"\n\nDB_class destroyed\n\n";
+    // std::cout<<"\n\nDB_class destroyed\n\n";
 }
 
 unsigned int db_class:: get_all_gas_names()

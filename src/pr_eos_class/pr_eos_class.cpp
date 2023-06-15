@@ -184,26 +184,64 @@ pr_eos::pr_eos(float pressure, float temperature, bool Calc_phi) //: mydbclass()
 
     std::cout<<"\n\n Enter base gas data : \n\n";
     base_data_pt = std::make_unique<std::vector<base_props>>();
-    base_data_pt->resize(size_of_gas_data);
+    // base_data_pt->resize(size_of_gas_data);
+    base_props *temp = new base_props; 
 
     uint16_t j = 0;
-    for(auto i : *base_data_pt){
-        std::cout<<"Enter base gas data for gas"<<j+1<<"\n";
+    // for(auto i : *base_data_pt){
+    for(j=0;j<size_of_gas_data;j++){
+        std::cout<<"Enter base gas data for Gas-"<<j+1<<"\n";
         // tc, pc, w, yi, xi, tsat
         std::cout<<"Enter Tc [in K]= ";
-        std::cin>>i.tc;
+        // std::cin>>i.tc;
+        std::cin>>temp->tc;
         
         std::cout<<"Enter Pc [in Pa]= ";
-        std::cin>>i.pc;
+        // std::cin>>i.pc;
+        std::cin>>temp->pc;
 
         std::cout<<"Enter w = ";
-        std::cin>>i.w;
+        // std::cin>>i.w;
+        std::cin>>temp->w;
 
         std::cout<<"Enter Yi= ";
-        std::cin>>i.yi;
+        // std::cin>>i.yi;
+        std::cin>>temp->yi;
 
-        i.xi = 0;
-        i.tsat = 0;
+        // i.xi = 0;
+        temp->xi = 0;
+        // i.tsat = 0;
+        temp->tsat = 0;
+        
+        base_data_pt->push_back(*temp);
+    }
+
+    delete temp;
+
+    //check composition
+    float sum = 0;
+    bool is_ok = true;
+
+
+    if(Is_mix){
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) {
+            sum = sum + i->yi;
+            if(sum>1){
+                is_ok = false;
+                std::cout<<"\nSum exceeds 1, enter the composition again \n";
+                break;
+            }
+        }
+        while(!is_ok){
+            for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i) {
+            sum = sum + i->yi;
+            if(sum>1){
+                is_ok = false;
+                std::cout<<"\nSum exceeds 1, enter the composition again \n";
+                break;
+            }
+        }
+        }
     }
 
     // get bip data

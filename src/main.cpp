@@ -57,6 +57,26 @@ void testPRclass()
     
 }
 
+void testPRclass_own()
+{
+    float p, t;
+    std::cout<<"Enter Pressure in barA : ";
+    std::cin>>p;
+    std::cout<<"Enter temperature in celcius : ";
+    std::cin>>t;
+    printf("\nPressure : %f \t Temperature : %f\n\n",p,t);
+
+    pr_eos eos(p, t, true);
+    // eos.set_print_debug_data(true);
+    // eos.getZ(true);
+    // eos.get_cp(true);
+    eos.calc_dew();
+    eos.print_base_data();
+    eos.print_bip_data();
+
+    
+}
+
 void get_bip_test()
 {
     // get that data
@@ -97,12 +117,81 @@ void get_bip_test()
 
 int main()
 {
-    std::cout<<"\n I'm from main\n\n";
+    // std::cout<<"\n I'm from main\n\n";
     // testDB();
-    testPRclass();
+    // testPRclass_own();
     // get_bip_test();
 
-    std::cout<<"\n\nEnd of main\n\n";
+    // std::cout<<"\n\nEnd of main\n\n";
+
+    //true main
+    std::cout<<"\n\n***************************************************************\n";
+    std::cout<<"***********  Simple PR EOS property finder  *******************\n";
+    std::cout<<"***************************************************************\n\n";
+    
+    float p, t;
+    std::cout<<"Enter Pressure in barA : ";
+    std::cin>>p;
+    std::cout<<"Enter temperature in celcius : ";
+    std::cin>>t;
+    pr_eos eos(p, t, "props.db", true);
+
+    std::cout<<"are u on ur own (y/N) : ";
+    char ch;
+    std::cin>>ch;
+    if(ch=='Y' || ch == 'y')
+        new(&eos) pr_eos(p, t, true);
+    
+    
+    std::cout<<"\n\nDo u wann print debug data (y/N): ";
+    std::cin>>ch;
+    if(ch=='Y' || ch == 'y')
+        eos.set_print_debug_data(true);
+
+    uint16_t c;
+
+    std::cout<<"\n\n\n Prints :\n1.Print Base gas Data\n2.Print BIP data\n\nEnter ur choice : ";
+    std::cin>>c;
+    std::cout<<"\n\n";
+    switch (c)
+    {
+    case 1:
+        eos.print_base_data();
+        break;
+    case 2:
+       eos.print_bip_data();
+        break;
+    default:
+        break;
+    }
+
+
+    std::cout<<"\n\n\n Abilities :\n1. Calc Z\n2. Calc Dew pt\n3. Calc Cp\n4.Print Base gas Data\n5.Print BIP data\n\nEnter ur choice : ";
+    std::cin>>c;
+    std::cout<<"\n\n";
+    switch (c)
+    {
+    case 1:
+        eos.getZ(true);
+        break;
+    case 2:
+        eos.calc_dew();
+        break;
+    case 3:
+        eos.get_cp(true);
+        break;
+    case 4:
+        eos.print_base_data();
+        break;
+    case 5:
+       eos.print_bip_data();
+        break;
+    default:
+        std::cout<<"\n\n\n Varataaaaaaa ........................ \n\n\n";
+        break;
+    }
+    
+    std::cout<<"\n\n\n Varataaaaaaa ........................ \n\n\n";
     return 0;
 }
 // one thing can be done open db again and again for each operations
