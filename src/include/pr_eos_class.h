@@ -1,5 +1,6 @@
 #include <vector>
 #include<memory>
+#include<mutex>
 
 //PR EOS properties definition
 // struct PR_props
@@ -35,5 +36,8 @@ public:
     void set_max_root_find_iterations(uint16_t max_root_find_iterations_f);
     void set_root_precision(float root_precision_f);
     void set_xi_total_tolerance(float xi_total_tolerance_f);
+
+private:
+    static std::mutex pr_mix_data_lock;
     
 };

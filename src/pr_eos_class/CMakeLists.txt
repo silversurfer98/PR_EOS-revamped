@@ -8,7 +8,7 @@ link_directories(${CMAKE_BINARY_DIR}/libs)
 
 #compile into static
 add_library(pr_eos_class ${LIB_SOURCES})
-
+target_compile_definitions(pr_eos_class PRIVATE ASYNC=1)
 target_link_libraries(pr_eos_class db_class math)
 
 

@@ -2,6 +2,7 @@
 #include "pr_eos_class.h"
 #include <iostream>
 #include <limits>
+
 void testDB()
 {
     db_class mydbclass("props.db");
@@ -114,6 +115,8 @@ void get_bip_test()
             std::cout<<"\n";}}
     std::cout<<"\n\n";
 }
+
+std::mutex pr_eos::pr_mix_data_lock;
 
 int main()
 {

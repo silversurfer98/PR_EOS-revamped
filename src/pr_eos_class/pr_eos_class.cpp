@@ -9,6 +9,11 @@
 #include "db_class.h"
 
 #include <iomanip>
+#include <future>
+#include <mutex>
+
+// #define ASYNC 0
+#define USE_FUNC 0
 
 //PR EOS properties definition
 struct PR_props
@@ -62,6 +67,7 @@ private:
     float t_reserve;
 
     std::shared_ptr<std::vector<float>> ini_p;
+    static std::mutex pr_mix_data_lock;
 
 
 // private member funcs
@@ -72,6 +78,8 @@ private:
     void calc_phi(float z, std::unique_ptr<std::vector<float>>& phi);
     float dew_pt_calc(bool is_first_time);
     void calc_cp();
+    void multi_t(base_props* data, uint16_t pos);
+
     
 
 
@@ -420,22 +428,50 @@ void pr_eos::pr_single_gas_props()
     parameters[2] = ((-1 * aa * bb + pow(bb, 2) + pow(bb, 3)));
 }
 
+void pr_eos::multi_t(base_props* data, uint16_t pos)
+{
+    PR_props* ans = new PR_props;
+    PR_consts_Calc(&(*data), ans);
+    std::lock_guard<std::mutex> lock(pr_mix_data_lock);
+    pr_mix_data.at(pos) = *ans;
+    delete ans;
+}
+
 void pr_eos::pr_mix_props()
 {
 // to implement, 
     // create pr_props vector
     // iterate through each base_gas_data and send to PR_const calc func
     // pr_mix_data.reserve(size_of_gas_data);
-    PR_props* ans = new PR_props;
-
     uint16_t k = 0;
+#if ASYNC
+    std::vector<std::future<void>> gg;
     if(base_data_pt)
         for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+            gg.push_back(std::async(std::launch::async, [this,i,k]() {
+                multi_t(&(*i),k);
+            }));
+            k++;
+        }
+    for(auto& i: gg)
+        i.get();
+#else
+
+    PR_props* ans = new PR_props;
+
+    if(base_data_pt)
+        for(auto i = base_data_pt->begin(); i != base_data_pt->end(); ++i){
+        #if USE_FUNC
+            multi_t(&(*i), k);
+        #else
             PR_consts_Calc(&(*i), ans);
             pr_mix_data.at(k) = *ans;
+        #endif
             k++;
         }
     delete ans;
+
+#endif
 
     // for printing
         // for(auto i : pr_mix_data)
